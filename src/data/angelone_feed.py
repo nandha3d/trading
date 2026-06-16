@@ -123,6 +123,7 @@ class AngelOneFeed:
                 "ce_oi": 0, "pe_oi": 0,
                 "ce_vol": 0, "pe_vol": 0,
                 "ce_oi_open": 0, "pe_oi_open": 0,
+                "ce_ltp_open": 0.0, "pe_ltp_open": 0.0,
             })
 
     def _launch_ws(self, auth_token: str, feed_token: str, api_key: str) -> None:
@@ -194,6 +195,8 @@ class AngelOneFeed:
             vol = int(msg.get("volume_trade_for_the_day", 0) or 0)
             pfx = "ce" if ot == "CE" else "pe"
             cell[f"{pfx}_ltp"] = ltp
+            if ltp > 0 and cell[f"{pfx}_ltp_open"] == 0.0:
+                cell[f"{pfx}_ltp_open"] = ltp   # first traded price of the session
             if oi:
                 if cell[f"{pfx}_oi_open"] == 0:
                     cell[f"{pfx}_oi_open"] = oi
@@ -329,6 +332,112 @@ class AngelOneFeed:
             if pain < best_pain:
                 best_pain, best = pain, target
         return best
+
+    @staticmethod
+    def _interpret(d_oi: float, d_price: float) -> str:
+        """Classic OI + price interpretation (writers' footprint)."""
+        if d_oi > 0 and d_price > 0:
+            return "Long Buildup"
+        if d_oi > 0 and d_price < 0:
+            return "Short Buildup"
+        if d_oi < 0 and d_price > 0:
+            return "Short Covering"
+        if d_oi < 0 and d_price < 0:
+            return "Long Unwinding"
+        return "Neutral"
+
+    def get_flow_payload(self) -> dict:
+        """Institutional-style live OI-flow snapshot for FlowMatrix.
+
+        Per-strike CE/PE OI, day-change, buildup interpretation, plus aggregate
+        support/resistance walls, PCR, max-pain, expected range and a directional
+        verdict derived from where smart money is writing options.
+        """
+        with self._lock:
+            spot = self.spot_price
+            strikes = sorted(self.chain.keys())
+            rows = []
+            tot_ce_oi = tot_pe_oi = 0
+            tot_ce_chg = tot_pe_chg = 0
+            for s in strikes:
+                c = self.chain[s]
+                ce_chg = (c["ce_oi"] - c["ce_oi_open"]) if c["ce_oi_open"] else 0
+                pe_chg = (c["pe_oi"] - c["pe_oi_open"]) if c["pe_oi_open"] else 0
+                ce_px_chg = (c["ce_ltp"] - c["ce_ltp_open"]) if c["ce_ltp_open"] else 0.0
+                pe_px_chg = (c["pe_ltp"] - c["pe_ltp_open"]) if c["pe_ltp_open"] else 0.0
+                tot_ce_oi += c["ce_oi"]
+                tot_pe_oi += c["pe_oi"]
+                tot_ce_chg += ce_chg
+                tot_pe_chg += pe_chg
+                rows.append({
+                    "strike": s,
+                    "ce_oi": c["ce_oi"], "pe_oi": c["pe_oi"],
+                    "ce_oi_chg": ce_chg, "pe_oi_chg": pe_chg,
+                    "ce_ltp": round(c["ce_ltp"], 2), "pe_ltp": round(c["pe_ltp"], 2),
+                    "ce_interp": self._interpret(ce_chg, ce_px_chg),
+                    "pe_interp": self._interpret(pe_chg, pe_px_chg),
+                })
+
+            resistance = max(strikes, key=lambda s: self.chain[s]["ce_oi"]) if strikes else 0
+            support = max(strikes, key=lambda s: self.chain[s]["pe_oi"]) if strikes else 0
+            pcr = round(tot_pe_oi / tot_ce_oi, 3) if tot_ce_oi else 1.0
+            max_pain = self._max_pain()
+
+            top_ce = sorted(rows, key=lambda r: r["ce_oi_chg"], reverse=True)[:5]
+            top_pe = sorted(rows, key=lambda r: r["pe_oi_chg"], reverse=True)[:5]
+
+            atm = min(strikes, key=lambda s: abs(s - spot)) if (strikes and spot) else 0
+            ac = self.chain.get(atm, {})
+            straddle = (ac.get("ce_ltp", 0.0) + ac.get("pe_ltp", 0.0))
+            expected_range = None
+            if spot and straddle > 0:
+                expected_range = {
+                    "low": round(spot - straddle, 2),
+                    "high": round(spot + straddle, 2),
+                    "straddle": round(straddle, 2),
+                    "atm": atm,
+                }
+
+            # Directional verdict: PE writing = support (bullish), CE writing =
+            # resistance (bearish); reinforced by PCR extremes.
+            score = 0
+            if tot_pe_chg > tot_ce_chg * 1.1:
+                score += 1
+            if tot_ce_chg > tot_pe_chg * 1.1:
+                score -= 1
+            if pcr > 1.2:
+                score += 1
+            elif pcr < 0.8:
+                score -= 1
+            verdict = "Bullish" if score > 0 else "Bearish" if score < 0 else "Neutral"
+
+            live = spot > 0 and any(c["ce_ltp"] > 0 or c["pe_ltp"] > 0 for c in self.chain.values())
+
+            return {
+                "underlying": self.underlying,
+                "expiry": self.expiry,
+                "timestamp": datetime.now().isoformat(),
+                "spot_price": round(spot, 2),
+                "future_price": round(self.future_price, 2) if self.future_price > 0 else None,
+                "pcr": pcr,
+                "max_pain": max_pain,
+                "max_pain_dist": round(spot - max_pain, 2) if spot else None,
+                "support": support,
+                "resistance": resistance,
+                "total_ce_oi": tot_ce_oi,
+                "total_pe_oi": tot_pe_oi,
+                "total_ce_oi_chg": tot_ce_chg,
+                "total_pe_oi_chg": tot_pe_chg,
+                "expected_range": expected_range,
+                "top_ce_buildup": top_ce,
+                "top_pe_buildup": top_pe,
+                "verdict": verdict,
+                "pcr_trend": self.pcr_trend,
+                "rows": rows,
+                "source": "angelone",
+                "status": self.status,
+                "stale": not live,
+            }
 
     def stop(self) -> None:
         try:

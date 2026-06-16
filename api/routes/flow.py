@@ -141,3 +141,33 @@ async def get_flow_dates(underlying: str = Query(...)):
         return {"dates": await asyncio.to_thread(_trading_dates, underlying)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+def _flow_live(underlying: str, expiry: str) -> dict:
+    """Institutional live OI-flow from the in-process Angel feed singleton."""
+    from src.data import angelone_scrip as scrip
+    from src.data.angelone_feed import get_feed
+
+    exp = expiry
+    if not exp:
+        # nearest non-expired expiry from the scrip master
+        exps = scrip.list_expiries(underlying)
+        today = _date.today().isoformat()
+        future = [e for e in exps if e >= today]
+        exp = future[0] if future else (exps[-1] if exps else "")
+    if not exp:
+        raise ValueError(f"No expiry available for {underlying}")
+
+    feed = get_feed(underlying, exp)
+    return feed.get_flow_payload()
+
+
+@router.get("/flow/live")
+async def get_flow_live(
+    underlying: str = Query(...),
+    expiry: str = Query("", description="ISO expiry; blank = nearest"),
+):
+    try:
+        return await asyncio.to_thread(_flow_live, underlying, expiry)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

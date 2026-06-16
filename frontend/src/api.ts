@@ -12,6 +12,7 @@ import type {
   OiToolsResponse,
   GridRequest,
   GridResponse,
+  FlowLiveResponse,
 } from "./types";
 
 const BASE = "/api";
@@ -119,6 +120,13 @@ export async function getFlowDates(underlying: string): Promise<string[]> {
   const res = await fetch(`${BASE}/flow/dates?underlying=${underlying}`);
   const data = await _json<{ dates: string[] }>(res);
   return data.dates;
+}
+
+export async function getFlowLive(underlying: string, expiry = ""): Promise<FlowLiveResponse> {
+  const params = new URLSearchParams({ underlying });
+  if (expiry) params.set("expiry", expiry);
+  const res = await fetch(`${BASE}/flow/live?${params.toString()}`);
+  return _json<FlowLiveResponse>(res);
 }
 
 export async function getDots(

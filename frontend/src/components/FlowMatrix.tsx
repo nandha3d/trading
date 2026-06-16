@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  getFlowDates, getDots, getOiExpiries, getOiStrikes, getOiAnalysis, getOiTools,
+  getFlowDates, getDots, getOiExpiries, getOiStrikes, getOiAnalysis, getOiTools, getFlowLive,
 } from "../api";
 import LWChart from "./LWChart";
 import type {
-  DotsResponse, OiAnalysisResponse, OiToolsResponse, OiContract,
+  DotsResponse, OiAnalysisResponse, OiToolsResponse, OiContract, FlowLiveResponse,
 } from "../types";
 
 type Sub = "dots" | "oi" | "stats" | "spurt" | "bigmove" | "trending" | "active" | "risk";
@@ -82,6 +82,27 @@ export default function FlowMatrix() {
   const [tools, setTools] = useState<OiToolsResponse | null>(null);
   const [showChart, setShowChart] = useState(true);
 
+  // Live OI-flow (institutional dashboard) — polls /flow/live while mode=live
+  const [liveFlow, setLiveFlow] = useState<FlowLiveResponse | null>(null);
+  const [liveErr, setLiveErr] = useState<string | null>(null);
+  const livePoll = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (mode !== "live") {
+      if (livePoll.current) { clearInterval(livePoll.current); livePoll.current = null; }
+      return;
+    }
+    let cancelled = false;
+    const tick = () => {
+      getFlowLive(underlying)
+        .then((d) => { if (!cancelled) { setLiveFlow(d); setLiveErr(null); } })
+        .catch((e) => { if (!cancelled) setLiveErr(e.message); });
+    };
+    tick();
+    livePoll.current = setInterval(tick, 4000);
+    return () => { cancelled = true; if (livePoll.current) { clearInterval(livePoll.current); livePoll.current = null; } };
+  }, [mode, underlying]);
+
   useEffect(() => {
     getFlowDates(underlying).then((d) => { setDates(d); if (d.length && !d.includes(date)) setDate(d[0]); }).catch(() => setDates([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -143,15 +164,23 @@ export default function FlowMatrix() {
             </div>
           </div>
           <Field label="Name"><select className={inp} value={underlying} onChange={(e) => setUnderlying(e.target.value)}><option>BANKNIFTY</option><option>NIFTY</option></select></Field>
-          <Field label="Date"><select className={inp} value={date} onChange={(e) => setDate(e.target.value)}>{dates.length === 0 && <option>—</option>}{dates.map((d) => <option key={d}>{d}</option>)}</select></Field>
-          {needsExpiry(sub) && <Field label="Expiry"><select className={inp} value={expiry} onChange={(e) => setExpiry(e.target.value)}>{expiries.length === 0 && <option>—</option>}{expiries.map((x) => <option key={x}>{x}</option>)}</select></Field>}
-          {sub === "oi" && <Field label="Strike"><select className={inp} value={strike} onChange={(e) => setStrike(Number(e.target.value))}>{strikes.length === 0 && <option>—</option>}{strikes.map((s) => <option key={s} value={s}>{s}</option>)}</select></Field>}
-          <Field label="Interval"><select className={inp} value={interval} onChange={(e) => setIntv(Number(e.target.value))}>{INTERVALS.map((m) => <option key={m} value={m}>{m} min</option>)}</select></Field>
-          <button onClick={go} disabled={loading || !date} className="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-bold">{loading ? "Loading…" : "Go"}</button>
+          {mode === "historical" && <>
+            <Field label="Date"><select className={inp} value={date} onChange={(e) => setDate(e.target.value)}>{dates.length === 0 && <option>—</option>}{dates.map((d) => <option key={d}>{d}</option>)}</select></Field>
+            {needsExpiry(sub) && <Field label="Expiry"><select className={inp} value={expiry} onChange={(e) => setExpiry(e.target.value)}>{expiries.length === 0 && <option>—</option>}{expiries.map((x) => <option key={x}>{x}</option>)}</select></Field>}
+            {sub === "oi" && <Field label="Strike"><select className={inp} value={strike} onChange={(e) => setStrike(Number(e.target.value))}>{strikes.length === 0 && <option>—</option>}{strikes.map((s) => <option key={s} value={s}>{s}</option>)}</select></Field>}
+            <Field label="Interval"><select className={inp} value={interval} onChange={(e) => setIntv(Number(e.target.value))}>{INTERVALS.map((m) => <option key={m} value={m}>{m} min</option>)}</select></Field>
+            <button onClick={go} disabled={loading || !date} className="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-bold">{loading ? "Loading…" : "Go"}</button>
+          </>}
+          {mode === "live" && (
+            <div className="flex items-center gap-2 px-2 py-2 self-center">
+              <span className="relative flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" /></span>
+              <span className="text-xs text-emerald-400 font-semibold">LIVE · auto-refresh 4s · nearest expiry</span>
+            </div>
+          )}
         </div>
       )}
 
-      {sub !== "risk" && (
+      {sub !== "risk" && mode === "historical" && (
         <div className="space-y-2">
           <button onClick={() => setShowChart((s) => !s)}
             className="text-xs text-gray-400 hover:text-gray-200 flex items-center gap-1">
@@ -165,13 +194,22 @@ export default function FlowMatrix() {
 
       {err && <div className="text-sm text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">{err}</div>}
 
-      {sub === "dots" && <DotsTable data={dots} />}
-      {sub === "oi" && <OiTable data={oi} />}
-      {sub === "stats" && <StatsView data={tools} />}
-      {sub === "spurt" && <ContractTable data={tools} which="spurt" title="OI Spurt — biggest last-bucket OI jumps" col="oi_chg_bucket" colLabel="Bucket OI Chg" />}
-      {sub === "bigmove" && <ContractTable data={tools} which="big_movement" title="Big OI Movement — largest day-cumulative OI change" col="oi_chg_day" colLabel="Day OI Chg" />}
-      {sub === "trending" && <TrendingView data={tools} />}
-      {sub === "active" && <ActiveView data={tools} />}
+      {/* LIVE mode: institutional OI-flow dashboard (real-time, polls /flow/live) */}
+      {mode === "live" && sub !== "risk" && <LiveFlow data={liveFlow} err={liveErr} />}
+
+      {/* HISTORICAL mode: per-interval confluence + OI tools (DB-backed) */}
+      {mode === "historical" && (
+        <>
+          {sub === "dots" && <DotsTable data={dots} />}
+          {sub === "oi" && <OiTable data={oi} />}
+          {sub === "stats" && <StatsView data={tools} />}
+          {sub === "spurt" && <ContractTable data={tools} which="spurt" title="OI Spurt — biggest last-bucket OI jumps" col="oi_chg_bucket" colLabel="Bucket OI Chg" />}
+          {sub === "bigmove" && <ContractTable data={tools} which="big_movement" title="Big OI Movement — largest day-cumulative OI change" col="oi_chg_day" colLabel="Day OI Chg" />}
+          {sub === "trending" && <TrendingView data={tools} />}
+          {sub === "active" && <ActiveView data={tools} />}
+        </>
+      )}
+
       {sub === "risk" && <RiskCalc lot={LOT[underlying] ?? 65} underlying={underlying} />}
     </div>
   );
@@ -179,6 +217,144 @@ export default function FlowMatrix() {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div className="flex flex-col gap-1"><label className="text-[10px] uppercase tracking-wider text-gray-500">{label}</label>{children}</div>;
+}
+
+// Compact OI formatter: 650000 -> 6.50L, 8200 -> 8.2K
+function fmtOi(n: number): string {
+  const a = Math.abs(n);
+  if (a >= 1e7) return (n / 1e7).toFixed(2) + "Cr";
+  if (a >= 1e5) return (n / 1e5).toFixed(2) + "L";
+  if (a >= 1e3) return (n / 1e3).toFixed(1) + "K";
+  return String(n);
+}
+
+function Kpi({ label, value, sub, tone }: { label: string; value: React.ReactNode; sub?: React.ReactNode; tone?: "bull" | "bear" | "neutral" }) {
+  const c = tone === "bull" ? "text-emerald-400" : tone === "bear" ? "text-red-400" : "text-gray-200";
+  return (
+    <div className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 min-w-[110px]">
+      <div className="text-[10px] uppercase tracking-wider text-gray-500">{label}</div>
+      <div className={`text-base font-bold font-mono ${c}`}>{value}</div>
+      {sub != null && <div className="text-[10px] text-gray-500 font-mono">{sub}</div>}
+    </div>
+  );
+}
+
+function LiveFlow({ data, err }: { data: FlowLiveResponse | null; err: string | null }) {
+  if (err) return <div className="text-sm text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">{err}</div>;
+  if (!data) return <Empty text="Connecting to live feed…" />;
+
+  const basis = data.future_price != null ? data.future_price - data.spot_price : null;
+  const ceChgTone = data.total_ce_oi_chg >= 0 ? "bear" : "bull";   // CE writing = bearish
+  const peChgTone = data.total_pe_oi_chg >= 0 ? "bull" : "bear";   // PE writing = bullish
+  const maxCeOi = Math.max(1, ...data.rows.map((r) => r.ce_oi));
+  const maxPeOi = Math.max(1, ...data.rows.map((r) => r.pe_oi));
+
+  return (
+    <div className="space-y-3">
+      {data.stale && (
+        <div className="text-[11px] text-amber-400/80 bg-amber-950/20 px-3 py-1.5 rounded-lg border border-amber-900/40">
+          Feed offline / market closed — last snapshot {String(data.timestamp).slice(11, 19)}
+        </div>
+      )}
+
+      {/* KPI strip */}
+      <div className="flex flex-wrap gap-2 items-stretch">
+        <div className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 flex flex-col justify-center">
+          <div className="text-[10px] uppercase tracking-wider text-gray-500">Bias</div>
+          {trendPill(data.verdict)}
+        </div>
+        <Kpi label="Spot" value={data.spot_price.toLocaleString("en-IN")} />
+        {data.future_price != null && (
+          <Kpi label="Future" value={data.future_price.toLocaleString("en-IN")}
+            sub={basis != null ? `${basis >= 0 ? "+" : ""}${basis.toFixed(1)} basis` : undefined}
+            tone={basis != null && basis >= 0 ? "bull" : "bear"} />
+        )}
+        <Kpi label="PCR" value={data.pcr.toFixed(2)} tone={data.pcr > 1.1 ? "bull" : data.pcr < 0.9 ? "bear" : "neutral"} />
+        <Kpi label="Max Pain" value={data.max_pain.toLocaleString("en-IN")}
+          sub={data.max_pain_dist != null ? `${data.max_pain_dist >= 0 ? "+" : ""}${data.max_pain_dist.toFixed(0)} vs spot` : undefined} />
+        <Kpi label="Support" value={data.support.toLocaleString("en-IN")} tone="bull" sub="max PE OI" />
+        <Kpi label="Resistance" value={data.resistance.toLocaleString("en-IN")} tone="bear" sub="max CE OI" />
+        {data.expected_range && (
+          <Kpi label="Expected Range" value={`${data.expected_range.low.toFixed(0)}–${data.expected_range.high.toFixed(0)}`}
+            sub={`±${data.expected_range.straddle.toFixed(0)} (ATM straddle)`} />
+        )}
+      </div>
+
+      {/* Net OI change CE vs PE */}
+      <div className="grid grid-cols-2 gap-2">
+        <Kpi label="Total CE OI Δ (resistance side)" value={`${data.total_ce_oi_chg >= 0 ? "+" : ""}${fmtOi(data.total_ce_oi_chg)}`} tone={ceChgTone} sub={`CE OI ${fmtOi(data.total_ce_oi)}`} />
+        <Kpi label="Total PE OI Δ (support side)" value={`${data.total_pe_oi_chg >= 0 ? "+" : ""}${fmtOi(data.total_pe_oi_chg)}`} tone={peChgTone} sub={`PE OI ${fmtOi(data.total_pe_oi)}`} />
+      </div>
+
+      {/* Top buildups */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="border border-gray-800 rounded-xl overflow-hidden">
+          <div className="bg-gray-900 px-3 py-2 text-xs font-bold text-red-300">Top CE OI Buildup (resistance forming)</div>
+          <table className="w-full text-sm"><tbody>
+            {data.top_ce_buildup.map((r) => (
+              <tr key={r.strike} className="border-t border-gray-800/70">
+                <td className="px-3 py-1.5 font-mono text-gray-300">{r.strike}</td>
+                <td className="px-3 py-1.5 text-right font-mono">{chg(r.ce_oi_chg)}</td>
+              </tr>
+            ))}
+          </tbody></table>
+        </div>
+        <div className="border border-gray-800 rounded-xl overflow-hidden">
+          <div className="bg-gray-900 px-3 py-2 text-xs font-bold text-emerald-300">Top PE OI Buildup (support forming)</div>
+          <table className="w-full text-sm"><tbody>
+            {data.top_pe_buildup.map((r) => (
+              <tr key={r.strike} className="border-t border-gray-800/70">
+                <td className="px-3 py-1.5 font-mono text-gray-300">{r.strike}</td>
+                <td className="px-3 py-1.5 text-right font-mono">{chg(r.pe_oi_chg)}</td>
+              </tr>
+            ))}
+          </tbody></table>
+        </div>
+      </div>
+
+      {/* Full per-strike OI flow table */}
+      <div className="border border-gray-800 rounded-xl overflow-hidden">
+        <div className="bg-gray-900 px-3 py-2 text-xs font-bold text-gray-300">Live OI Flow · {data.underlying} {data.expiry} · {String(data.timestamp).slice(11, 19)}</div>
+        <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-gray-900/80 sticky top-0 text-gray-400 uppercase tracking-wider">
+              <tr>
+                <th className="px-2 py-2 text-left">CE Interp</th>
+                <th className="px-2 py-2 text-right">CE ΔOI</th>
+                <th className="px-2 py-2 text-right">CE OI</th>
+                <th className="px-2 py-2 text-center">Strike</th>
+                <th className="px-2 py-2 text-left">PE OI</th>
+                <th className="px-2 py-2 text-right">PE ΔOI</th>
+                <th className="px-2 py-2 text-right">PE Interp</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.rows.map((r) => {
+                const atm = data.expected_range && r.strike === data.expected_range.atm;
+                return (
+                  <tr key={r.strike} className={`border-t border-gray-800/60 ${atm ? "bg-blue-950/30" : ""}`}>
+                    <td className="px-2 py-1"><InterpBadge v={r.ce_interp} /></td>
+                    <td className="px-2 py-1 text-right font-mono">{chg(r.ce_oi_chg)}</td>
+                    <td className="px-2 py-1 text-right font-mono text-gray-400 relative">
+                      <span className="absolute right-0 top-0 h-full bg-red-600/15" style={{ width: `${(r.ce_oi / maxCeOi) * 100}%` }} />
+                      <span className="relative">{fmtOi(r.ce_oi)}</span>
+                    </td>
+                    <td className="px-2 py-1 text-center font-mono font-bold text-gray-200">{r.strike}</td>
+                    <td className="px-2 py-1 font-mono text-gray-400 relative">
+                      <span className="absolute left-0 top-0 h-full bg-emerald-600/15" style={{ width: `${(r.pe_oi / maxPeOi) * 100}%` }} />
+                      <span className="relative">{fmtOi(r.pe_oi)}</span>
+                    </td>
+                    <td className="px-2 py-1 text-right font-mono">{chg(r.pe_oi_chg)}</td>
+                    <td className="px-2 py-1 text-right"><InterpBadge v={r.pe_interp} /></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function DotsTable({ data }: { data: DotsResponse | null }) {

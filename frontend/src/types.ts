@@ -321,6 +321,52 @@ export interface DotsResponse {
   message: string | null;
 }
 
+// ---- FlowMatrix: Live OI Flow ----
+
+export interface FlowStrikeRow {
+  strike: number;
+  ce_oi: number;
+  pe_oi: number;
+  ce_oi_chg: number;
+  pe_oi_chg: number;
+  ce_ltp: number;
+  pe_ltp: number;
+  ce_interp: string;
+  pe_interp: string;
+}
+
+export interface FlowBuildupRow {
+  strike: number;
+  ce_oi_chg: number;
+  pe_oi_chg: number;
+}
+
+export interface FlowLiveResponse {
+  underlying: string;
+  expiry: string;
+  timestamp: string;
+  spot_price: number;
+  future_price: number | null;
+  pcr: number;
+  max_pain: number;
+  max_pain_dist: number | null;
+  support: number;
+  resistance: number;
+  total_ce_oi: number;
+  total_pe_oi: number;
+  total_ce_oi_chg: number;
+  total_pe_oi_chg: number;
+  expected_range: { low: number; high: number; straddle: number; atm: number } | null;
+  top_ce_buildup: FlowBuildupRow[];
+  top_pe_buildup: FlowBuildupRow[];
+  verdict: string;
+  pcr_trend: { time: string; pcr: number; max_pain: number }[];
+  rows: FlowStrikeRow[];
+  source: string;
+  status: string;
+  stale: boolean;
+}
+
 // ---- FlowMatrix: OI Analysis ----
 
 export interface OiBreak {
