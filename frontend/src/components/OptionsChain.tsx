@@ -1298,7 +1298,11 @@ export default function OptionsChain() {
                           return [`${val >= 0 ? "+" : ""}₹${Math.round(val).toLocaleString("en-IN")}`, name];
                         }}
                       />
-                      <Legend verticalAlign="top" height={22} iconType="circle" wrapperStyle={{ fontSize: "10px" }} />
+                      <Legend verticalAlign="top" height={22} iconType="circle" wrapperStyle={{ fontSize: "10px" }}
+                        payload={[
+                          { value: "On Expiry", type: "circle", id: "expiry_pnl", color: "#22c55e" },
+                          { value: "On Target Date", type: "circle", id: "today_pnl", color: "#60a5fa" },
+                        ]} />
 
                       {/* Green fill: Area fills exactly under the profit triangle, above zero */}
                       <Area type="linear" dataKey="profit_fill" fill="rgba(16,185,129,0.22)"
