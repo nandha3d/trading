@@ -6,7 +6,7 @@ import {
 import type { OptionsChainResponse, PayoffResponse, SavedStrategy, PayoffLegSpec } from "../types";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, ComposedChart, Line, Area, ReferenceLine, ReferenceDot
+  ResponsiveContainer, ComposedChart, Line, Area, ReferenceLine, ReferenceArea, ReferenceDot
 } from "recharts";
 
 interface BuilderLeg extends PayoffLegSpec {
@@ -1293,7 +1293,8 @@ export default function OptionsChain() {
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={payoffChartData} margin={{ top: 14, right: 16, left: 10, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 6" stroke="#1a2233" vertical={false} />
-                      <XAxis dataKey="spot" stroke="#6b7280" fontSize={9}
+                      <XAxis dataKey="spot" type="number" scale="linear" domain={["dataMin", "dataMax"]}
+                        allowDataOverflow stroke="#6b7280" fontSize={9}
                         tickFormatter={(v) => (v / 1000).toFixed(1) + "k"} />
                       <YAxis stroke="#6b7280" fontSize={9}
                         tickFormatter={(v) => v >= 0 ? `+${(v/1000).toFixed(0)}k` : `${(v/1000).toFixed(0)}k`}
@@ -1319,6 +1320,13 @@ export default function OptionsChain() {
                       {/* Red fill: Area fills exactly under the loss curve, below zero */}
                       <Area type="linear" dataKey="loss_fill" fill="rgba(239,68,68,0.25)"
                         stroke="none" isAnimationActive={false} legendType="none" activeDot={false} />
+
+                      {/* ±1SD safe zone band (≈68% of expected expiry outcomes) */}
+                      {sigma1 && spotPrice && (
+                        <ReferenceArea x1={spotPrice - sigma1} x2={spotPrice + sigma1}
+                          fill="#6366f1" fillOpacity={0.07} ifOverflow="extendDomain"
+                          label={{ value: "68% zone", fill: "#818cf8", fontSize: 8, position: "insideBottom" }} />
+                      )}
 
                       {/* Zero line */}
                       <ReferenceLine y={0} stroke="#4b5563" strokeWidth={1} />

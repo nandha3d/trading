@@ -24,6 +24,9 @@ const SUBS: [Sub, string][] = [
 const TOOL_SUBS: Sub[] = ["stats", "spurt", "bigmove", "trending", "active"];
 const needsExpiry = (s: Sub) => s === "oi" || TOOL_SUBS.includes(s);
 
+// Live mode collapses to the institutional dashboard + risk calc.
+const LIVE_SUBS: [Sub, string][] = [["dots", "Live OI Flow"], ["risk", "Risk Calc"]];
+
 // Current NSE lot sizes (revised 1 Jan 2026): NIFTY 65, BANKNIFTY 30
 const LOT: Record<string, number> = { NIFTY: 65, BANKNIFTY: 30, FINNIFTY: 60, MIDCPNIFTY: 120 };
 
@@ -144,9 +147,11 @@ export default function FlowMatrix() {
           <span className="text-xs text-gray-500">OI confluence &amp; interpretation engine</span>
         </div>
         <div className="flex flex-wrap bg-gray-950 rounded-lg p-0.5 border border-gray-800">
-          {SUBS.map(([id, label]) => (
+          {/* Live mode = single institutional OI-flow dashboard; the per-tool tabs
+              are historical-OI tools that need intraday OI the platform lacks. */}
+          {(mode === "live" ? LIVE_SUBS : SUBS).map(([id, label]) => (
             <button key={id} onClick={() => setSub(id)}
-              className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${sub === id ? "bg-blue-600 text-white" : "text-gray-400 hover:text-gray-200"}`}>
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${(mode === "live" ? (id === "risk" ? sub === "risk" : sub !== "risk") : sub === id) ? "bg-blue-600 text-white" : "text-gray-400 hover:text-gray-200"}`}>
               {label}
             </button>
           ))}
