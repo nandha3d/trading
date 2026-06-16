@@ -22,6 +22,11 @@ def _lot_size(underlying: str) -> int:
 
 
 def _compute_payoff(req: PayoffRequest) -> PayoffResponse:
+    if not req.legs:
+        raise ValueError("No legs in request")
+    if req.spot <= 0:
+        raise ValueError("spot must be > 0")
+
     exp_date = date.fromisoformat(req.expiry)
     cur_date = date.fromisoformat(req.current_date)
     dte_years = max((exp_date - cur_date).days, 0) / 365.0
@@ -37,7 +42,7 @@ def _compute_payoff(req: PayoffRequest) -> PayoffResponse:
     for leg in req.legs:
         t = dte_years if dte_years > 0 else 1 / 365
         iv = calculate_iv(leg.entry_price, spot, leg.strike, t, r, leg.opt_type.upper())
-        leg_ivs.append(max(iv, 0.05))  # floor at 5%
+        leg_ivs.append(min(max(iv, 0.05), 2.0))  # clamp: 5%–200%
 
     curve: list[PayoffPoint] = []
     for s in spots:

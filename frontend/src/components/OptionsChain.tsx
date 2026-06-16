@@ -344,7 +344,8 @@ export default function OptionsChain() {
 
   // Strategy Payoff calculation hook
   useEffect(() => {
-    if (legs.length === 0 || !spotPrice || !selectedExpiry) {
+    const activeExpiry = isLive ? liveExpiry : selectedExpiry;
+    if (legs.length === 0 || !spotPrice || !activeExpiry) {
       setPayoff(null);
       return;
     }
@@ -353,7 +354,7 @@ export default function OptionsChain() {
     const now = new Date();
     const localToday = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
     const currentDateVal = isLive ? localToday : selectedDate;
-    const expiryVal = isLive ? liveExpiry : selectedExpiry;
+    const expiryVal = activeExpiry;
 
     const req = {
       underlying,
