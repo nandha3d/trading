@@ -6,7 +6,7 @@ import {
 import type { OptionsChainResponse, PayoffResponse, SavedStrategy, PayoffLegSpec } from "../types";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, LineChart, Line, ReferenceLine, ReferenceArea, ReferenceDot
+  ResponsiveContainer, ComposedChart, Line, Area, ReferenceLine, ReferenceDot
 } from "recharts";
 
 interface BuilderLeg extends PayoffLegSpec {
@@ -119,6 +119,7 @@ export default function OptionsChain() {
     (localStorage.getItem("oc_underlying") as "NIFTY" | "BANKNIFTY") ?? "NIFTY"
   )[0] ?? "");
   const wsRef = useRef<WebSocket | null>(null);
+  const [wsReconnect, setWsReconnect] = useState(0);
   
   // View options
   const [strikeFilter, setStrikeFilter] = useState<"ATM_5" | "ATM_10" | "ALL">("ATM_10");
@@ -231,10 +232,12 @@ export default function OptionsChain() {
     };
 
     ws.onerror = () => setError("Live feed connection error — retrying on next change.");
-    ws.onclose = () => { /* don't reset isLive — let effect re-run on dep change */ };
+    ws.onclose = () => {
+      if (isLive) setTimeout(() => setWsReconnect(n => n + 1), 3000);
+    };
 
     return () => { ws.close(); };
-  }, [isLive, underlying, liveExpiry]);
+  }, [isLive, underlying, liveExpiry, wsReconnect]);
 
   const spotPrice = data?.spot_price ?? null;
   
@@ -273,20 +276,6 @@ export default function OptionsChain() {
     return payoff.curve.filter(p => p.spot >= spotPrice - spread && p.spot <= spotPrice + spread);
   }, [payoff, spotPrice, sigma1]);
 
-  // Profit zones (where expiry_pnl > 0) for triangle green fill
-  const profitZones = useMemo(() => {
-    if (!filteredCurve.length) return [];
-    const zones: { x1: number; x2: number }[] = [];
-    let inProfit = false;
-    let zoneStart = 0;
-    for (const pt of filteredCurve) {
-      if (pt.expiry_pnl > 0 && !inProfit) { inProfit = true; zoneStart = pt.spot; }
-      else if (pt.expiry_pnl <= 0 && inProfit) { inProfit = false; zones.push({ x1: zoneStart, x2: pt.spot }); }
-    }
-    if (inProfit && filteredCurve.length) zones.push({ x1: zoneStart, x2: filteredCurve[filteredCurve.length - 1].spot });
-    return zones;
-  }, [filteredCurve]);
-
   // IV simulator
   const [ivShift, setIvShift] = useState(0); // percentage points shift, e.g. +5 = IV increased by 5%
   const ivImpact = payoff ? Math.round(payoff.net_greeks.vega * ivShift) : 0;
@@ -305,6 +294,14 @@ export default function OptionsChain() {
     if (ivShift === 0) return filteredCurve;
     return filteredCurve.map(pt => ({ ...pt, today_pnl: ((pt as { today_pnl?: number }).today_pnl ?? 0) + ivImpact }));
   }, [filteredCurve, ivShift, ivImpact]);
+
+  // Payoff chart data: profit_fill/loss_fill follow exact curve shape for Area components
+  const payoffChartData = useMemo(() =>
+    simulatedCurve.map(pt => ({
+      ...pt,
+      profit_fill: Math.max(0, pt.expiry_pnl),
+      loss_fill: Math.min(0, pt.expiry_pnl),
+    })), [simulatedCurve]);
 
   // Filter chain rows based on selections
   const filteredChain = useMemo(() => {
@@ -381,7 +378,7 @@ export default function OptionsChain() {
         console.error("Payoff builder pricing error:", e);
         setPayoffLoading(false);
       });
-  }, [legs, spotPrice, selectedExpiry, liveExpiry, selectedDate, underlying, isLive]);
+  }, [legs, selectedExpiry, liveExpiry, selectedDate, underlying, isLive]);
 
   // Leg Builder triggers from Options Chain
   const addLeg = (strike: number, opt_type: "CE" | "PE", action: "BUY" | "SELL", entryPrice: number) => {
@@ -1271,7 +1268,7 @@ export default function OptionsChain() {
                 )}
                 {payoff && (
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={simulatedCurve} margin={{ top: 14, right: 16, left: 10, bottom: 5 }}>
+                    <ComposedChart data={payoffChartData} margin={{ top: 14, right: 16, left: 10, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 6" stroke="#1a2233" vertical={false} />
                       <XAxis dataKey="spot" stroke="#6b7280" fontSize={9}
                         tickFormatter={(v) => (v / 1000).toFixed(1) + "k"} />
@@ -1282,33 +1279,19 @@ export default function OptionsChain() {
                         contentStyle={{ backgroundColor: "#030712", borderColor: "#1f2937", fontSize: 11 }}
                         labelStyle={{ color: "#9ca3af", fontWeight: "bold" }}
                         labelFormatter={(v: number) => `Spot: ₹${v.toLocaleString("en-IN")}`}
-                        formatter={(val: number, name: string) => [
-                          `${val >= 0 ? "+" : ""}₹${Math.round(val).toLocaleString("en-IN")}`,
-                          name
-                        ]}
+                        formatter={(val: number, name: string) => {
+                          if (name === "profit_fill" || name === "loss_fill") return [null, null];
+                          return [`${val >= 0 ? "+" : ""}₹${Math.round(val).toLocaleString("en-IN")}`, name];
+                        }}
                       />
                       <Legend verticalAlign="top" height={22} iconType="circle" wrapperStyle={{ fontSize: "10px" }} />
 
-                      {/* Green profit zone: inside triangle (between breakevens, above zero) */}
-                      {profitZones.map((z, i) => (
-                        <ReferenceArea key={`pz-${i}`} x1={z.x1} x2={z.x2} y1={0}
-                          fill="rgba(16,185,129,0.22)" fillOpacity={1} />
-                      ))}
-
-                      {/* Red loss zones: outside breakevens, below zero only */}
-                      {payoff.breakevens.length >= 1 && (
-                        <ReferenceArea x2={payoff.breakevens[0]} y2={0}
-                          fill="rgba(239,68,68,0.28)" fillOpacity={1} />
-                      )}
-                      {payoff.breakevens.length >= 2 && (
-                        <ReferenceArea x1={payoff.breakevens[payoff.breakevens.length - 1]} y2={0}
-                          fill="rgba(239,68,68,0.28)" fillOpacity={1} />
-                      )}
-                      {/* Single breakeven (debit spread etc): shade everything outside it below zero */}
-                      {payoff.breakevens.length === 1 && (
-                        <ReferenceArea x1={payoff.breakevens[0]} y2={0}
-                          fill="rgba(239,68,68,0.28)" fillOpacity={1} />
-                      )}
+                      {/* Green fill: Area fills exactly under the profit triangle, above zero */}
+                      <Area type="linear" dataKey="profit_fill" fill="rgba(16,185,129,0.22)"
+                        stroke="none" isAnimationActive={false} legendType="none" activeDot={false} />
+                      {/* Red fill: Area fills exactly under the loss curve, below zero */}
+                      <Area type="linear" dataKey="loss_fill" fill="rgba(239,68,68,0.25)"
+                        stroke="none" isAnimationActive={false} legendType="none" activeDot={false} />
 
                       {/* Zero line */}
                       <ReferenceLine y={0} stroke="#4b5563" strokeWidth={1} />
@@ -1358,9 +1341,9 @@ export default function OptionsChain() {
                         );
                       })()}
 
-                      <Line type="linear" dataKey="expiry_pnl" name="On Expiry" stroke="#22c55e" strokeWidth={3} dot={false} />
-                      <Line type="monotone" dataKey="today_pnl" name="On Target Date" stroke="#60a5fa" strokeWidth={1.5} dot={false} strokeDasharray="5 3" />
-                    </LineChart>
+                      <Line type="linear" dataKey="expiry_pnl" name="On Expiry" stroke="#22c55e" strokeWidth={3} dot={false} isAnimationActive={false} />
+                      <Line type="monotone" dataKey="today_pnl" name="On Target Date" stroke="#60a5fa" strokeWidth={1.5} dot={false} strokeDasharray="5 3" isAnimationActive={false} />
+                    </ComposedChart>
                   </ResponsiveContainer>
                 )}
                 {payoff && sigma1 && (
