@@ -1,0 +1,21 @@
+{
+  "provider": "SIMULATOR",
+  "shoonya": {
+    "user": "",
+    "password": "",
+    "factor2": "",
+    "vc": "",
+    "app_key": "",
+    "imei": ""
+  },
+  "truedata": {
+    "username": "",
+    "password": ""
+  },
+  "angelone": {
+    "api_key": "1Emb7eeW",
+    "client_code": "",
+    "password": "",
+    "totp_seed": ""
+  }
+}

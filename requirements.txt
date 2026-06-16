@@ -1,0 +1,35 @@
+# --- Broker / data ---
+pya3                  # Alice Blue official Python SDK (live WS + historical)
+smartapi-python       # Angel One SmartAPI Python SDK
+pyotp                 # TOTP generation for SmartAPI login
+logzero               # dependency for SmartAPI
+requests
+websocket-client
+certifi               # CA bundle for HTTPS
+pip-system-certs; sys_platform == "win32"  # Windows trust store only
+
+# --- Storage / compute ---
+duckdb>=1.0
+polars>=1.0
+pyarrow>=16          # parquet
+pandas               # interop where libs need it
+
+# --- Options math ---
+py_vollib            # Black-Scholes price / greeks / IV
+numpy
+scipy
+
+# --- Free historical backfill ---
+kaggle               # Kaggle dataset download API
+
+# --- API / app (later phases) ---
+fastapi
+uvicorn[standard]
+pydantic>=2
+pydantic-settings
+
+# --- Utils ---
+python-dotenv
+typer                # CLI
+rich                 # pretty CLI output
+tenacity             # retry/backoff for downloaders

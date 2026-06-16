@@ -1,0 +1,19 @@
+[Unit]
+Description=Angel One Live Options Feed (NIFTY + BANKNIFTY WebSocket)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/trading
+ExecStart=/opt/trading/.venv/bin/python -m src.data.angelone_feed
+Restart=on-failure
+RestartSec=30
+StandardOutput=append:/opt/trading/logs/angelone_feed.log
+StandardError=append:/opt/trading/logs/angelone_feed.log
+
+# Market hours gate — systemd timer starts/stops this
+# Do NOT enable this service directly; use the timer pair below
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,10 @@
+# Starts the Angel One live feed at 09:00 IST = 03:30 UTC on weekdays
+[Unit]
+Description=Start Angel One feed at market open
+
+[Timer]
+OnCalendar=Mon-Fri 03:30:00 UTC
+Persistent=false
+
+[Install]
+WantedBy=timers.target

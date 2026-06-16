@@ -1,0 +1,10 @@
+# Stops the Angel One live feed at 15:35 IST = 10:05 UTC on weekdays
+[Unit]
+Description=Stop Angel One feed at market close
+
+[Timer]
+OnCalendar=Mon-Fri 10:05:00 UTC
+Persistent=false
+
+[Install]
+WantedBy=timers.target

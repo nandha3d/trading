@@ -1,0 +1,14 @@
+.env
+data/
+__pycache__/
+*.pyc
+.venv/
+venv/
+.kaggle/
+*.parquet
+.DS_Store
+node_modules/
+dist/
+build/
+logs/
+historical data/
