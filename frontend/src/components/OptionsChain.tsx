@@ -1358,7 +1358,7 @@ export default function OptionsChain() {
                         );
                       })()}
 
-                      <Line type="monotone" dataKey="expiry_pnl" name="On Expiry" stroke="#22c55e" strokeWidth={3} dot={false} />
+                      <Line type="linear" dataKey="expiry_pnl" name="On Expiry" stroke="#22c55e" strokeWidth={3} dot={false} />
                       <Line type="monotone" dataKey="today_pnl" name="On Target Date" stroke="#60a5fa" strokeWidth={1.5} dot={false} strokeDasharray="5 3" />
                     </LineChart>
                   </ResponsiveContainer>

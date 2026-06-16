@@ -36,6 +36,13 @@ def _compute_payoff(req: PayoffRequest) -> PayoffResponse:
     n_steps = 80
     pct_range = 0.12  # ±12% from spot
     spots = [spot * (1 - pct_range + 2 * pct_range * i / n_steps) for i in range(n_steps + 1)]
+    # Inject unique strike prices so the triangle peak lands exactly at the right spot
+    unique_strikes = sorted({leg.strike for leg in req.legs})
+    lo, hi = spots[0], spots[-1]
+    for k in unique_strikes:
+        if lo < k < hi:
+            spots.append(float(k))
+    spots.sort()
 
     # Per-leg: resolve IV from entry_price at current spot
     leg_ivs: list[float] = []
