@@ -240,6 +240,8 @@ export default function OptionsChain() {
   }, [isLive, underlying, liveExpiry, wsReconnect]);
 
   const spotPrice = data?.spot_price ?? null;
+  const futurePrice = data?.future_price ?? null;
+  const basis = (futurePrice && spotPrice) ? futurePrice - spotPrice : null;
   
   // Calculate ATM Strike
   const atmStrike = useMemo(() => {
@@ -903,11 +905,23 @@ export default function OptionsChain() {
             <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
               Double-Sided Option Chain & Opstra-Builder
             </span>
-            {spotPrice && (
-              <span className="text-sm font-black text-green-400 font-mono">
-                SPOT: {fmtPrice(spotPrice)}
-              </span>
-            )}
+            <div className="flex items-center gap-4">
+              {futurePrice && (
+                <span className="text-sm font-black text-sky-400 font-mono">
+                  FUT: {fmtPrice(futurePrice)}
+                  {basis !== null && (
+                    <span className={`ml-1.5 text-[10px] font-bold ${basis >= 0 ? "text-green-500" : "text-red-500"}`}>
+                      {basis >= 0 ? "+" : ""}{basis.toFixed(1)}
+                    </span>
+                  )}
+                </span>
+              )}
+              {spotPrice && (
+                <span className="text-sm font-black text-green-400 font-mono">
+                  SPOT: {fmtPrice(spotPrice)}
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto relative min-h-0">

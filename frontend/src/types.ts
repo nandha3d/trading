@@ -209,6 +209,8 @@ export interface OptionsChainResponse {
   expiry: string;
   timestamp: string;
   spot_price: number | null;
+  future_price?: number | null;   // front-month index future (live Angel feed only)
+  future_expiry?: string | null;  // ISO expiry of the future contract above
   chain: OptionsChainRow[];
   summary: OptionsChainSummary | null;
   source?: string;   // "angelone" = real live feed; absent/other = simulated

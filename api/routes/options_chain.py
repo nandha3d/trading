@@ -40,6 +40,8 @@ class OptionsChainResponse(BaseModel):
     expiry: str
     timestamp: str
     spot_price: Optional[float] = None
+    future_price: Optional[float] = None
+    future_expiry: Optional[str] = None
     chain: list[OptionsChainRow]
     summary: Optional[OptionsChainSummary] = None
 

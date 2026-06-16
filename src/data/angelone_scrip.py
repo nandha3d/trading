@@ -85,6 +85,40 @@ def spot_token(underlying: str) -> tuple[str, int]:
     return tok, EXCH_NSE_CM
 
 
+def future_token(underlying: str, scrip: Optional[list[dict]] = None) -> tuple[str, str]:
+    """Return (token, expiry_iso) for the nearest-expiry index future of `underlying`.
+
+    Picks the soonest FUTIDX expiry that is today or later (the front-month
+    contract). Raises ValueError if none found.
+    """
+    scrip = scrip if scrip is not None else fetch_scrip_master()
+    want = underlying.upper()
+    today = date.today()
+    best: Optional[tuple[date, str]] = None
+    for row in scrip:
+        if row.get("exch_seg") != "NFO":
+            continue
+        if row.get("name") != want:
+            continue
+        if row.get("instrumenttype") != "FUTIDX":
+            continue
+        exp_raw = row.get("expiry", "")
+        try:
+            exp_d = datetime.strptime(exp_raw, "%d%b%Y").date()
+        except ValueError:
+            continue
+        if exp_d < today:
+            continue
+        tok = row.get("token", "")
+        if not tok:
+            continue
+        if best is None or exp_d < best[0]:
+            best = (exp_d, tok)
+    if best is None:
+        raise ValueError(f"No FUTIDX contract found for {want}")
+    return best[1], best[0].isoformat()
+
+
 def resolve_option_tokens(
     underlying: str,
     expiry_iso: str,

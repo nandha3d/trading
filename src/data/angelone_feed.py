@@ -48,9 +48,12 @@ class AngelOneFeed:
 
         self._lock = threading.Lock()
         self.spot_price: float = 0.0
+        self.future_price: float = 0.0
+        self.future_expiry: str = ""
         self.chain: Dict[int, dict] = {}        # strike -> live cells
         self.token_map: Dict[str, dict] = {}    # token -> {strike, opt_type}
         self._spot_token: str = ""
+        self._future_token: str = ""
         self.pcr_trend: list[dict] = []
         self.status = "init"
         self.connected = False
@@ -96,6 +99,12 @@ class AngelOneFeed:
         if not self.token_map:
             raise RuntimeError(f"No tokens resolved for {self.underlying} {self.expiry}")
         self._spot_token, _ = scrip.spot_token(self.underlying)
+        # Front-month index future (best-effort — chain still works without it)
+        try:
+            self._future_token, self.future_expiry = scrip.future_token(self.underlying)
+        except Exception as e:
+            logger.warning(f"No future token for {self.underlying}: {e}")
+            self._future_token, self.future_expiry = "", ""
 
     def _build_empty_chain(self) -> None:
         for meta in self.token_map.values():
@@ -114,9 +123,12 @@ class AngelOneFeed:
         sws = SmartWebSocketV2(auth_token, api_key, settings.angelone_client_code, feed_token)
         self._sws = sws
 
+        nfo_tokens = list(self.token_map.keys())
+        if self._future_token:
+            nfo_tokens.append(self._future_token)
         token_list = [
             {"exchangeType": scrip.EXCH_NSE_CM, "tokens": [self._spot_token]},
-            {"exchangeType": scrip.EXCH_NFO, "tokens": list(self.token_map.keys())},
+            {"exchangeType": scrip.EXCH_NFO, "tokens": nfo_tokens},
         ]
 
         def on_open(_wsapp):
@@ -161,6 +173,9 @@ class AngelOneFeed:
             if token == self._spot_token:
                 self.spot_price = ltp
                 return
+            if token and token == self._future_token:
+                self.future_price = ltp
+                return
             meta = self.token_map.get(token)
             if not meta:
                 return
@@ -190,6 +205,7 @@ class AngelOneFeed:
         t = self._dte_years()
         with self._lock:
             spot = self.spot_price
+            future = self.future_price
             chain_list = []
             total_ce_oi = total_pe_oi = 0
             has_ltp = False
@@ -218,6 +234,8 @@ class AngelOneFeed:
                 "expiry": self.expiry,
                 "timestamp": datetime.now().isoformat(),
                 "spot_price": round(spot, 2),
+                "future_price": round(future, 2) if future > 0 else None,
+                "future_expiry": self.future_expiry or None,
                 "pcr": pcr,
                 "max_pain": max_pain,
                 "total_ce_oi": total_ce_oi,
