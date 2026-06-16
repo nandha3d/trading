@@ -79,12 +79,12 @@ def _compute_payoff(req: PayoffRequest) -> PayoffResponse:
     n_steps = 100
     pct_range = 0.15  # ±15% from spot
     strikes = sorted({li["strike"] for li in legs_info})
-    spots = [spot * (1 - pct_range + 2 * pct_range * i / n_steps) for i in range(n_steps + 1)]
-    lo, hi = spots[0], spots[-1]
-    for k in strikes:                       # land an exact sample on every kink
-        if lo < k < hi:
-            spots.append(k)
-    spots = sorted(set(spots))
+    raw = [spot * (1 - pct_range + 2 * pct_range * i / n_steps) for i in range(n_steps + 1)]
+    lo, hi = raw[0], raw[-1]
+    raw += [k for k in strikes if lo < k < hi]   # land an exact sample on every kink
+    # Snap to 2 decimals and dedup so the injected strike never sits a hair away
+    # from a grid point (which would render as a tiny vertical kink).
+    spots = sorted({round(s, 2) for s in raw})
 
     curve = [
         PayoffPoint(spot=round(s, 2), expiry_pnl=round(expiry_pnl(s), 2),

@@ -11,6 +11,7 @@ import {
 
 interface BuilderLeg extends PayoffLegSpec {
   id: string;
+  visible: boolean;   // include this leg in the payoff visualization
 }
 
 // Current (post-1-Jan-2026 NSE revision) lot sizes — fallback only; the live
@@ -350,7 +351,8 @@ export default function OptionsChain() {
   // Strategy Payoff calculation hook
   useEffect(() => {
     const activeExpiry = isLive ? liveExpiry : selectedExpiry;
-    if (legs.length === 0 || !spotPrice || !activeExpiry) {
+    const activeLegs = legs.filter((l) => l.visible);   // only checked legs are visualized
+    if (activeLegs.length === 0 || !spotPrice || !activeExpiry) {
       setPayoff(null);
       return;
     }
@@ -370,7 +372,7 @@ export default function OptionsChain() {
       // Only forward the broker's authoritative lot (live). In historical mode
       // leave null so the server picks the date-correct lot from the expiry.
       lot_size: data?.lot_size ?? null,
-      legs: legs.map(({ action, opt_type, strike, lots, entry_price, underlying: u }) => ({
+      legs: activeLegs.map(({ action, opt_type, strike, lots, entry_price, underlying: u }) => ({
         action,
         opt_type,
         strike,
@@ -402,6 +404,7 @@ export default function OptionsChain() {
       entry_price: entryPrice,
       lots: 1,
       underlying,
+      visible: true,
     };
     setLegs((prev) => [...prev, newLeg]);
   };
@@ -410,6 +413,30 @@ export default function OptionsChain() {
     setLegs((prev) =>
       prev.map((leg) => (leg.id === id ? { ...leg, ...updates } : leg))
     );
+  };
+
+  const handleToggleAction = (id: string) => {
+    setLegs((prev) => prev.map((leg) =>
+      leg.id === id ? { ...leg, action: leg.action === "BUY" ? "SELL" : "BUY" } : leg
+    ));
+  };
+
+  const handleToggleVisible = (id: string) => {
+    setLegs((prev) => prev.map((leg) =>
+      leg.id === id ? { ...leg, visible: !leg.visible } : leg
+    ));
+  };
+
+  // Change strike or option type, auto-filling entry price from the live/chain LTP.
+  const handleRetarget = (id: string, updates: { strike?: number; opt_type?: "CE" | "PE" }) => {
+    setLegs((prev) => prev.map((leg) => {
+      if (leg.id !== id) return leg;
+      const next = { ...leg, ...updates };
+      const row = data?.chain.find((r) => r.strike === next.strike);
+      const ltp = (next.opt_type === "CE" ? row?.ce?.close : row?.pe?.close) ?? null;
+      if (ltp !== null) next.entry_price = ltp;
+      return next;
+    }));
   };
 
   const handleRemoveLeg = (id: string) => {
@@ -459,6 +486,7 @@ export default function OptionsChain() {
     setLegs(
       saved.legs.map((l, i) => ({
         id: `saved-${Date.now()}-${i}`,
+        visible: true,
         ...l
       }))
     );
@@ -1168,6 +1196,7 @@ export default function OptionsChain() {
                 <table className="w-full text-xs font-mono border-collapse">
                   <thead>
                     <tr className="text-[9px] text-gray-500 uppercase tracking-wider border-b border-gray-800">
+                      <th className="py-1.5 px-1 text-center" title="Show in payoff">👁</th>
                       <th className="py-1.5 px-1 text-left">B/S</th>
                       <th className="py-1.5 px-1 text-center">Strike</th>
                       <th className="py-1.5 px-1 text-center">Type</th>
@@ -1182,22 +1211,50 @@ export default function OptionsChain() {
                     {legs.map((leg) => {
                       const currentLtp = getLegLtp(data, leg);
                       const pnl = getLegPnl(data, leg);
+                      const isBuy = leg.action === "BUY";
+                      // Row tint by side; dimmed when excluded from the payoff.
+                      const rowTint = isBuy ? "bg-emerald-950/15" : "bg-rose-950/15";
+                      const strikeOpts = data?.chain?.map((r) => r.strike) ?? [];
                       return (
-                        <tr key={leg.id} className="hover:bg-gray-900/60 transition-colors">
-                          <td className="py-1.5 px-1">
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold border ${
-                              leg.action === "BUY"
-                                ? "bg-green-950 text-green-400 border-green-900/40"
-                                : "bg-red-950 text-red-400 border-red-900/40"
-                            }`}>
-                              {leg.action === "BUY" ? "B" : "S"}
-                            </span>
-                          </td>
-                          <td className="py-1.5 px-1 text-center font-bold text-gray-200">{leg.strike}</td>
+                        <tr key={leg.id}
+                          className={`transition-colors ${rowTint} ${leg.visible ? "" : "opacity-40"} hover:bg-gray-900/60`}>
                           <td className="py-1.5 px-1 text-center">
-                            <span className={`font-bold ${leg.opt_type === "CE" ? "text-red-400" : "text-green-400"}`}>
-                              {leg.opt_type}
-                            </span>
+                            <input type="checkbox" checked={leg.visible}
+                              onChange={() => handleToggleVisible(leg.id)}
+                              className="accent-blue-500 cursor-pointer align-middle" title="Show in payoff" />
+                          </td>
+                          <td className="py-1.5 px-1">
+                            <button
+                              onClick={() => handleToggleAction(leg.id)}
+                              title="Click to toggle Buy/Sell"
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold border cursor-pointer transition-colors ${
+                                isBuy
+                                  ? "bg-green-950 text-green-400 border-green-900/40 hover:bg-green-900/40"
+                                  : "bg-red-950 text-red-400 border-red-900/40 hover:bg-red-900/40"
+                              }`}>
+                              {isBuy ? "B" : "S"}
+                            </button>
+                          </td>
+                          <td className="py-1.5 px-1 text-center">
+                            {strikeOpts.length > 0 ? (
+                              <select value={leg.strike}
+                                onChange={(e) => handleRetarget(leg.id, { strike: Number(e.target.value) })}
+                                className="bg-gray-900 border border-gray-800 rounded px-1 py-0.5 text-[11px] text-white font-bold text-center focus:outline-none focus:border-blue-600">
+                                {strikeOpts.map((s) => <option key={s} value={s}>{s}</option>)}
+                              </select>
+                            ) : (
+                              <input type="number" value={leg.strike}
+                                onChange={(e) => handleRetarget(leg.id, { strike: Number(e.target.value) })}
+                                className="w-16 bg-gray-900 border border-gray-800 rounded px-1 py-0.5 text-[11px] text-white font-bold text-center focus:outline-none focus:border-blue-600" />
+                            )}
+                          </td>
+                          <td className="py-1.5 px-1 text-center">
+                            <select value={leg.opt_type}
+                              onChange={(e) => handleRetarget(leg.id, { opt_type: e.target.value as "CE" | "PE" })}
+                              className={`bg-gray-900 border border-gray-800 rounded px-1 py-0.5 text-[11px] font-bold text-center focus:outline-none focus:border-blue-600 ${leg.opt_type === "CE" ? "text-red-400" : "text-green-400"}`}>
+                              <option value="CE">CE</option>
+                              <option value="PE">PE</option>
+                            </select>
                           </td>
                           <td className="py-1.5 px-1">
                             <input
@@ -1331,37 +1388,27 @@ export default function OptionsChain() {
                       {/* Zero line */}
                       <ReferenceLine y={0} stroke="#4b5563" strokeWidth={1} />
 
-                      {/* Breakeven vertical lines */}
+                      {/* Breakeven vertical lines (labels at the bottom to avoid SD overlap) */}
                       {payoff.breakevens.map((be, i) => (
                         <ReferenceLine key={`be-${i}`} x={be} stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="4 3"
-                          label={{ value: `BE ${be.toLocaleString("en-IN")}`, fill: "#f59e0b", fontSize: 8,
-                            position: i === 0 ? "insideTopRight" : "insideTopLeft" }} />
+                          label={{ value: `BE ${Math.round(be).toLocaleString("en-IN")}`, fill: "#f59e0b", fontSize: 8,
+                            position: "insideBottom" }} />
                       ))}
 
-                      {/* 2σ lines */}
+                      {/* 2σ edges only (1σ shown as the shaded band above) — labels at top */}
                       {sigma1 && spotPrice && (
                         <>
-                          <ReferenceLine x={Math.round(spotPrice - sigma1 * 2)} stroke="#a78bfa" strokeDasharray="3 5" strokeWidth={1}
-                            label={{ value: "−2SD", fill: "#a78bfa", fontSize: 8, position: "insideTopRight" }} />
-                          <ReferenceLine x={Math.round(spotPrice + sigma1 * 2)} stroke="#a78bfa" strokeDasharray="3 5" strokeWidth={1}
-                            label={{ value: "+2SD", fill: "#a78bfa", fontSize: 8, position: "insideTopLeft" }} />
-                        </>
-                      )}
-
-                      {/* 1σ lines */}
-                      {sigma1 && spotPrice && (
-                        <>
-                          <ReferenceLine x={Math.round(spotPrice - sigma1)} stroke="#818cf8" strokeDasharray="4 3" strokeWidth={1.5}
-                            label={{ value: "−1SD", fill: "#818cf8", fontSize: 8, position: "insideTopRight" }} />
-                          <ReferenceLine x={Math.round(spotPrice + sigma1)} stroke="#818cf8" strokeDasharray="4 3" strokeWidth={1.5}
-                            label={{ value: "+1SD", fill: "#818cf8", fontSize: 8, position: "insideTopLeft" }} />
+                          <ReferenceLine x={Math.round(spotPrice - sigma1 * 2)} stroke="#a78bfa" strokeDasharray="2 5" strokeWidth={1}
+                            label={{ value: "−2SD", fill: "#a78bfa", fontSize: 8, position: "insideTopLeft" }} />
+                          <ReferenceLine x={Math.round(spotPrice + sigma1 * 2)} stroke="#a78bfa" strokeDasharray="2 5" strokeWidth={1}
+                            label={{ value: "+2SD", fill: "#a78bfa", fontSize: 8, position: "insideTopRight" }} />
                         </>
                       )}
 
                       {/* Spot line */}
                       {spotPrice && (
                         <ReferenceLine x={spotPrice} stroke="#22c55e" strokeWidth={1.5} strokeDasharray="4 3"
-                          label={{ value: "SPOT", fill: "#22c55e", fontSize: 8, position: "insideTopRight" }} />
+                          label={{ value: "SPOT", fill: "#22c55e", fontSize: 8, position: "top" }} />
                       )}
 
                       {/* Projected P&L dot at current spot price */}
@@ -1376,8 +1423,8 @@ export default function OptionsChain() {
                         );
                       })()}
 
-                      <Line type="linear" dataKey="expiry_pnl" name="On Expiry" stroke="#22c55e" strokeWidth={3} dot={false} isAnimationActive={false} />
-                      <Line type="monotone" dataKey="today_pnl" name="On Target Date" stroke="#60a5fa" strokeWidth={1.5} dot={false} strokeDasharray="5 3" isAnimationActive={false} />
+                      <Line type="linear" dataKey="expiry_pnl" name="On Expiry" stroke="#22c55e" strokeWidth={2.5} dot={false} isAnimationActive={false} connectNulls />
+                      <Line type="linear" dataKey="today_pnl" name="On Target Date" stroke="#60a5fa" strokeWidth={1.5} dot={false} strokeDasharray="5 3" isAnimationActive={false} connectNulls />
                     </ComposedChart>
                   </ResponsiveContainer>
                 )}
