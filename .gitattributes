@@ -1,0 +1,5 @@
+# Shell scripts and systemd units run on Linux — force LF so a CRLF checkout on
+# Windows never produces a broken `#!/usr/bin/env bash\r` shebang on the server.
+*.sh            text eol=lf
+*.service       text eol=lf
+*.timer         text eol=lf

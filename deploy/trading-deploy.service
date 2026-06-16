@@ -1,0 +1,10 @@
+[Unit]
+Description=Pull-based auto-deploy for the trading app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/trading
+# flock prevents overlapping runs if a deploy takes longer than the timer interval
+ExecStart=/usr/bin/flock -n /tmp/trading-deploy.lock /opt/trading/scripts/deploy_pull.sh
