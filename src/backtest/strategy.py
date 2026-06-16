@@ -6,7 +6,7 @@ Strike selection per leg: ATM offset (steps), or nearest-premium, or delta.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import time
+from datetime import date, time
 from enum import Enum
 
 
@@ -40,11 +40,31 @@ class RiskRule:
     unit: Unit = Unit.PERCENT
 
 
-# Per-underlying contract specs (lot size + strike step). Extend as needed.
+# NSE revised all index-derivative lot sizes effective 1 Jan 2026 (applies to
+# every contract expiring Jan 2026 onward). Backtests on older expiries must use
+# the pre-revision sizes, so lot size is resolved per-contract by expiry date.
+_LOT_REVISION = date(2026, 1, 1)
+_LOT_PRE_2026 = {"NIFTY": 75, "BANKNIFTY": 35, "FINNIFTY": 65, "MIDCPNIFTY": 140, "NIFTYNXT50": 25}
+_LOT_CURRENT = {"NIFTY": 65, "BANKNIFTY": 30, "FINNIFTY": 60, "MIDCPNIFTY": 120, "NIFTYNXT50": 25}
+
+
+def lot_size_for(underlying: str, expiry: date | None = None) -> int:
+    """Lot size for a contract, honouring the 1 Jan 2026 NSE revision.
+
+    `expiry` < 2026-01-01 -> pre-revision size; otherwise current size.
+    No expiry given -> current size.
+    """
+    u = underlying.upper()
+    table = _LOT_PRE_2026 if (expiry is not None and expiry < _LOT_REVISION) else _LOT_CURRENT
+    return table.get(u, 25)
+
+
+# Per-underlying contract specs. lot_size = CURRENT (post-2026) default; use
+# lot_size_for(underlying, expiry) for date-accurate sizing in backtests.
 CONTRACT_SPECS: dict[str, dict] = {
-    "NIFTY": {"lot_size": 75, "strike_step": 50},
-    "BANKNIFTY": {"lot_size": 35, "strike_step": 100},
-    "FINNIFTY": {"lot_size": 65, "strike_step": 50},
+    "NIFTY": {"lot_size": 65, "strike_step": 50},
+    "BANKNIFTY": {"lot_size": 30, "strike_step": 100},
+    "FINNIFTY": {"lot_size": 60, "strike_step": 50},
 }
 
 

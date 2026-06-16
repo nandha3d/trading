@@ -24,7 +24,8 @@ const SUBS: [Sub, string][] = [
 const TOOL_SUBS: Sub[] = ["stats", "spurt", "bigmove", "trending", "active"];
 const needsExpiry = (s: Sub) => s === "oi" || TOOL_SUBS.includes(s);
 
-const LOT: Record<string, number> = { NIFTY: 75, BANKNIFTY: 35 };
+// Current NSE lot sizes (revised 1 Jan 2026): NIFTY 65, BANKNIFTY 30
+const LOT: Record<string, number> = { NIFTY: 65, BANKNIFTY: 30, FINNIFTY: 60, MIDCPNIFTY: 120 };
 
 const inp =
   "bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:border-blue-500";
@@ -171,7 +172,7 @@ export default function FlowMatrix() {
       {sub === "bigmove" && <ContractTable data={tools} which="big_movement" title="Big OI Movement — largest day-cumulative OI change" col="oi_chg_day" colLabel="Day OI Chg" />}
       {sub === "trending" && <TrendingView data={tools} />}
       {sub === "active" && <ActiveView data={tools} />}
-      {sub === "risk" && <RiskCalc lot={LOT[underlying] ?? 75} underlying={underlying} />}
+      {sub === "risk" && <RiskCalc lot={LOT[underlying] ?? 65} underlying={underlying} />}
     </div>
   );
 }

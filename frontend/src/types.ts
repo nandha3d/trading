@@ -211,6 +211,7 @@ export interface OptionsChainResponse {
   spot_price: number | null;
   future_price?: number | null;   // front-month index future (live Angel feed only)
   future_expiry?: string | null;  // ISO expiry of the future contract above
+  lot_size?: number | null;       // broker's authoritative lot size (live feed)
   chain: OptionsChainRow[];
   summary: OptionsChainSummary | null;
   source?: string;   // "angelone" = real live feed; absent/other = simulated
@@ -236,6 +237,7 @@ export interface PayoffRequest {
   current_date: string;
   legs: PayoffLegSpec[];
   r: number;
+  lot_size?: number | null;   // from live chain (broker scrip); overrides server default
 }
 
 export interface PayoffPoint {

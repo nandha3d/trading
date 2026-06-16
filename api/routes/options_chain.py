@@ -42,6 +42,7 @@ class OptionsChainResponse(BaseModel):
     spot_price: Optional[float] = None
     future_price: Optional[float] = None
     future_expiry: Optional[str] = None
+    lot_size: Optional[int] = None
     chain: list[OptionsChainRow]
     summary: Optional[OptionsChainSummary] = None
 
@@ -259,11 +260,11 @@ def _calculate_payoff(req: PayoffRequest) -> PayoffResponse:
     days = (expiry_date - current_dt).days
     T_start = max(0.0001, days) / 365.0
     
-    from src.backtest.strategy import CONTRACT_SPECS
+    from src.backtest.strategy import lot_size_for
     from src.data.options_math import calculate_iv, calculate_greeks, bs_price
-    
-    specs = CONTRACT_SPECS.get(underlying, {"lot_size": 75})
-    lot_size = specs["lot_size"]
+
+    # date-aware lot (honours 1 Jan 2026 NSE revision)
+    lot_size = lot_size_for(underlying, expiry_date)
     
     legs_data = []
     net_premium = 0.0

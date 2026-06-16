@@ -27,7 +27,9 @@ logger = logging.getLogger("AngelOneFeed")
 RISK_FREE = 0.065
 
 STEP = {"NIFTY": 50, "BANKNIFTY": 100, "FINNIFTY": 50, "MIDCPNIFTY": 75}
-LOT = {"NIFTY": 75, "BANKNIFTY": 35, "FINNIFTY": 65, "MIDCPNIFTY": 120}
+# Fallback only — broker scrip master lotsize overrides this at resolve time.
+# Current NSE sizes (revised 1 Jan 2026).
+LOT = {"NIFTY": 65, "BANKNIFTY": 30, "FINNIFTY": 60, "MIDCPNIFTY": 120}
 
 # Last good live chain is mirrored to disk so a market-closed day / holiday /
 # server restart can replay the last fetched data instead of going blank.
@@ -44,7 +46,7 @@ class AngelOneFeed:
         self.expiry = expiry
         self.window = window
         self.step = STEP.get(self.underlying, 50)
-        self.lot_size = LOT.get(self.underlying, 75)
+        self.lot_size = LOT.get(self.underlying, 65)
 
         self._lock = threading.Lock()
         self.spot_price: float = 0.0
@@ -98,6 +100,11 @@ class AngelOneFeed:
         self.token_map = scrip.resolve_option_tokens(self.underlying, self.expiry, strikes=wanted)
         if not self.token_map:
             raise RuntimeError(f"No tokens resolved for {self.underlying} {self.expiry}")
+        # Broker scrip master is the source of truth for lot size (auto-tracks
+        # NSE revisions). Fall back to the hardcoded LOT map if absent.
+        scrip_lots = [m.get("lotsize", 0) for m in self.token_map.values() if m.get("lotsize")]
+        if scrip_lots:
+            self.lot_size = max(set(scrip_lots), key=scrip_lots.count)  # mode
         self._spot_token, _ = scrip.spot_token(self.underlying)
         # Front-month index future (best-effort — chain still works without it)
         try:
@@ -236,6 +243,7 @@ class AngelOneFeed:
                 "spot_price": round(spot, 2),
                 "future_price": round(future, 2) if future > 0 else None,
                 "future_expiry": self.future_expiry or None,
+                "lot_size": self.lot_size,
                 "pcr": pcr,
                 "max_pain": max_pain,
                 "total_ce_oi": total_ce_oi,

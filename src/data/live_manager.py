@@ -41,7 +41,7 @@ class LiveSession:
         self.pcr_trend: List[Dict] = []
         self.block_trades: List[Dict] = []
         self.last_update: str = ""
-        self.lot_size = 75 if self.underlying == "NIFTY" else 35
+        self.lot_size = 65 if self.underlying == "NIFTY" else 30  # current NSE sizes (Jan 2026 revision)
         self.is_active = False
         self._seed_data()
 

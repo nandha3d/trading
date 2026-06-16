@@ -7,18 +7,16 @@ from datetime import date, datetime
 from fastapi import APIRouter, HTTPException
 
 from api.models import NetGreeks, PayoffPoint, PayoffRequest, PayoffResponse, SaveStrategyRequest, SavedStrategyResponse
-from src.backtest.strategy import CONTRACT_SPECS
+from src.backtest.strategy import lot_size_for
 from src.data import storage
 from src.data.options_math import bs_price, calculate_greeks, calculate_iv
 
 router = APIRouter()
 
-_DEFAULT_LOT = {"NIFTY": 75, "BANKNIFTY": 35, "FINNIFTY": 65}
 
-
-def _lot_size(underlying: str) -> int:
-    spec = CONTRACT_SPECS.get(underlying.upper())
-    return spec["lot_size"] if spec else _DEFAULT_LOT.get(underlying.upper(), 25)
+def _lot_size(underlying: str, expiry: date | None = None) -> int:
+    # date-aware (honours the 1 Jan 2026 NSE lot revision)
+    return lot_size_for(underlying, expiry)
 
 
 def _compute_payoff(req: PayoffRequest) -> PayoffResponse:
@@ -30,6 +28,13 @@ def _compute_payoff(req: PayoffRequest) -> PayoffResponse:
     exp_date = date.fromisoformat(req.expiry)
     cur_date = date.fromisoformat(req.current_date)
     dte_years = max((exp_date - cur_date).days, 0) / 365.0
+
+    def resolve_lot(u: str) -> int:
+        # client-supplied lot (from live chain / broker scrip) wins for the
+        # primary underlying; else date-aware default
+        if req.lot_size and u.upper() == req.underlying.upper():
+            return req.lot_size
+        return _lot_size(u, exp_date)
 
     spot = req.spot
     r = req.r
@@ -56,7 +61,7 @@ def _compute_payoff(req: PayoffRequest) -> PayoffResponse:
         expiry_pnl = 0.0
         today_pnl = 0.0
         for leg, sigma in zip(req.legs, leg_ivs):
-            lot = _lot_size(leg.underlying or req.underlying)
+            lot = resolve_lot(leg.underlying or req.underlying)
             qty = leg.lots * lot
             sign = -1 if leg.action.upper() == "SELL" else 1
 
@@ -93,7 +98,7 @@ def _compute_payoff(req: PayoffRequest) -> PayoffResponse:
 
     net_premium = 0.0
     for leg in req.legs:
-        lot = _lot_size(leg.underlying or req.underlying)
+        lot = resolve_lot(leg.underlying or req.underlying)
         qty = leg.lots * lot
         sign = 1 if leg.action.upper() == "SELL" else -1
         net_premium += sign * leg.entry_price * qty
@@ -101,7 +106,7 @@ def _compute_payoff(req: PayoffRequest) -> PayoffResponse:
     ng = {"delta": 0.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0}
     t0 = dte_years if dte_years > 0 else 1 / 365
     for leg, sigma in zip(req.legs, leg_ivs):
-        lot = _lot_size(leg.underlying or req.underlying)
+        lot = resolve_lot(leg.underlying or req.underlying)
         qty = leg.lots * lot
         sign = -1 if leg.action.upper() == "SELL" else 1
         g = calculate_greeks(spot, leg.strike, t0, r, sigma, leg.opt_type.upper())

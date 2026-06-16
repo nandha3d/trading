@@ -25,7 +25,7 @@ from .iv_regime import (compute_pcr, compute_synthetic_ivr, classify_vix_regime,
                          fetch_entry_snapshot)
 from .metrics import Stats, compute
 from . import signal_engine
-from .strategy import Action, Leg, RiskRule, Selection, StrategySpec, Unit
+from .strategy import Action, Leg, RiskRule, Selection, StrategySpec, Unit, lot_size_for
 
 
 @dataclass
@@ -350,7 +350,7 @@ def run_day(spec: StrategySpec, day: date, expiry: date, costs: CostModel,
         entry_prem = prices[0]
         edelta = greeks.delta(entry_prem, entry_spot, strike, t_years, leg.opt_type.value) or 0.5
         legs.append(LegFill(leg=leg, strike=strike, entry=entry_prem,
-                            qty=leg.lots * spec.spec["lot_size"]))
+                            qty=leg.lots * lot_size_for(spec.underlying, expiry)))
         leg_prices.append(prices)
         leg_meta.append({"edelta": edelta})
 

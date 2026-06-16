@@ -315,7 +315,7 @@ export default function InstitutionalAnalytics() {
                     const badgeClass = alert.action === "BUY" 
                       ? "bg-green-950 text-green-400 border-green-800/40" 
                       : "bg-red-950 text-red-400 border-red-800/40";
-                    const lots = Math.round(alert.qty / telemetry.total_ce_oi * 100) || Math.round(alert.qty / (underlying === "NIFTY" ? 75 : 35));
+                    const lots = Math.round(alert.qty / telemetry.total_ce_oi * 100) || Math.round(alert.qty / (underlying === "NIFTY" ? 65 : 30));
                     
                     return (
                       <tr key={idx} className={`border-b border-gray-850/60 transition-colors font-mono hover:bg-gray-850/20 ${rowClass}`}>

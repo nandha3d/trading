@@ -13,7 +13,13 @@ interface BuilderLeg extends PayoffLegSpec {
   id: string;
 }
 
-const LOT_SIZES: Record<string, number> = { NIFTY: 75, BANKNIFTY: 35 };
+// Current (post-1-Jan-2026 NSE revision) lot sizes — fallback only; the live
+// chain payload carries the broker's authoritative lot_size when available.
+const LOT_SIZES: Record<string, number> = { NIFTY: 65, BANKNIFTY: 30, FINNIFTY: 60, MIDCPNIFTY: 120 };
+
+function lotSizeFor(data: OptionsChainResponse | null, underlying: string): number {
+  return data?.lot_size ?? LOT_SIZES[underlying] ?? 25;
+}
 
 function getLegLtp(data: OptionsChainResponse | null, leg: BuilderLeg): number | null {
   const row = data?.chain.find(r => r.strike === leg.strike);
@@ -25,7 +31,7 @@ function getLegPnl(data: OptionsChainResponse | null, leg: BuilderLeg): number |
   const ltp = getLegLtp(data, leg);
   if (ltp === null) return null;
   const sign = leg.action === "BUY" ? 1 : -1;
-  const lotSize = LOT_SIZES[leg.underlying] ?? 25;
+  const lotSize = lotSizeFor(data, leg.underlying);
   return sign * (ltp - leg.entry_price) * leg.lots * lotSize;
 }
 
@@ -361,6 +367,9 @@ export default function OptionsChain() {
       expiry: expiryVal,
       current_date: currentDateVal,
       r: 0.065,
+      // Only forward the broker's authoritative lot (live). In historical mode
+      // leave null so the server picks the date-correct lot from the expiry.
+      lot_size: data?.lot_size ?? null,
       legs: legs.map(({ action, opt_type, strike, lots, entry_price, underlying: u }) => ({
         action,
         opt_type,

@@ -201,6 +201,7 @@ class PayoffRequest(BaseModel):
     current_date: str
     legs: list[PayoffLegSpec]
     r: float = 0.065
+    lot_size: Optional[int] = None   # client-supplied (from live chain); overrides default
 
 
 class PayoffPoint(BaseModel):
