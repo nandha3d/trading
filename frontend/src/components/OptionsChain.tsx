@@ -501,6 +501,54 @@ export default function OptionsChain() {
     }));
   }, [filteredChain]);
 
+  const oiAnalysis = useMemo(() => {
+    if (!data?.summary || !data?.chain?.length || !spotPrice) return null;
+    const { pcr, max_pain, total_ce_oi, total_pe_oi } = data.summary;
+
+    // PCR signal
+    let pcrSignal: "BULLISH" | "BEARISH" | "NEUTRAL";
+    let pcrNote: string;
+    if (pcr > 1.3)       { pcrSignal = "BULLISH"; pcrNote = `PCR ${pcr.toFixed(2)} — heavy put writing, bulls in control`; }
+    else if (pcr > 1.0)  { pcrSignal = "NEUTRAL";  pcrNote = `PCR ${pcr.toFixed(2)} — mild put dominance, slight bullish bias`; }
+    else if (pcr > 0.8)  { pcrSignal = "NEUTRAL";  pcrNote = `PCR ${pcr.toFixed(2)} — balanced OI, range-bound likely`; }
+    else                 { pcrSignal = "BEARISH"; pcrNote = `PCR ${pcr.toFixed(2)} — call writing dominates, bears in control`; }
+
+    // Max Pain vs Spot
+    const painPct = ((spotPrice - max_pain) / max_pain) * 100;
+    let painSignal: "BULLISH" | "BEARISH" | "NEUTRAL";
+    let painNote: string;
+    if (painPct > 1.5)       { painSignal = "BEARISH"; painNote = `Spot ${painPct.toFixed(1)}% above Max Pain ${max_pain.toLocaleString("en-IN")} — gravity pull DOWN`; }
+    else if (painPct < -1.5) { painSignal = "BULLISH"; painNote = `Spot ${Math.abs(painPct).toFixed(1)}% below Max Pain ${max_pain.toLocaleString("en-IN")} — gravity pull UP`; }
+    else                     { painSignal = "NEUTRAL";  painNote = `Spot near Max Pain ${max_pain.toLocaleString("en-IN")} — market at equilibrium`; }
+
+    // OI skew
+    const skewPct = total_ce_oi + total_pe_oi > 0 ? ((total_pe_oi - total_ce_oi) / (total_pe_oi + total_ce_oi)) * 100 : 0;
+    let skewNote: string;
+    if (skewPct > 10)       skewNote = `PE OI ${skewPct.toFixed(0)}% heavier — strong put base, market supported`;
+    else if (skewPct < -10) skewNote = `CE OI ${Math.abs(skewPct).toFixed(0)}% heavier — call wall overhead, market capped`;
+    else                    skewNote = `CE/PE OI balanced (skew ${skewPct.toFixed(0)}%) — no directional bias from writing`;
+
+    // Key levels from OI
+    let maxCeOiStrike = 0, maxCeOi = 0, maxPeOiStrike = 0, maxPeOi = 0;
+    for (const row of data.chain) {
+      const ceOi = row.ce?.oi ?? 0;
+      const peOi = row.pe?.oi ?? 0;
+      if (ceOi > maxCeOi) { maxCeOi = ceOi; maxCeOiStrike = row.strike; }
+      if (peOi > maxPeOi) { maxPeOi = peOi; maxPeOiStrike = row.strike; }
+    }
+
+    // Spot vs levels
+    const aboveResistance = spotPrice > maxCeOiStrike;
+    const belowSupport = spotPrice < maxPeOiStrike;
+
+    // Overall verdict
+    const bullPts = (pcrSignal === "BULLISH" ? 1 : 0) + (painSignal === "BULLISH" ? 1 : 0) + (skewPct > 10 ? 1 : 0);
+    const bearPts = (pcrSignal === "BEARISH" ? 1 : 0) + (painSignal === "BEARISH" ? 1 : 0) + (skewPct < -10 ? 1 : 0);
+    const verdict: "BULLISH" | "BEARISH" | "NEUTRAL" = bullPts > bearPts ? "BULLISH" : bearPts > bullPts ? "BEARISH" : "NEUTRAL";
+
+    return { verdict, pcrSignal, pcrNote, painSignal, painNote, skewNote, maxCeOiStrike, maxCeOi, maxPeOiStrike, maxPeOi, aboveResistance, belowSupport };
+  }, [data, spotPrice]);
+
   const inp =
     "bg-gray-950 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 w-full sm:w-auto min-w-[140px]";
 
@@ -805,6 +853,46 @@ export default function OptionsChain() {
               <div className={`text-base font-black ${c.color}`}>{c.val}</div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* OI Intelligence Panel */}
+      {oiAnalysis && (
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-lg">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">OI Intelligence</span>
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+              oiAnalysis.verdict === "BULLISH" ? "bg-green-900/50 text-green-400 border-green-700/50" :
+              oiAnalysis.verdict === "BEARISH" ? "bg-red-900/50 text-red-400 border-red-700/50" :
+              "bg-yellow-900/30 text-yellow-400 border-yellow-700/40"
+            }`}>
+              {oiAnalysis.verdict === "BULLISH" ? "↑ BULLISH" : oiAnalysis.verdict === "BEARISH" ? "↓ BEARISH" : "→ NEUTRAL"}
+            </span>
+            <span className="text-[10px] text-gray-600 italic">Based on live OI positioning</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+            <div className={`flex items-start gap-2 p-2.5 rounded-lg bg-gray-950/60 border ${oiAnalysis.pcrSignal === "BULLISH" ? "border-green-800/40" : oiAnalysis.pcrSignal === "BEARISH" ? "border-red-800/40" : "border-gray-800/60"}`}>
+              <span>📊</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.pcrNote}</span>
+            </div>
+            <div className={`flex items-start gap-2 p-2.5 rounded-lg bg-gray-950/60 border ${oiAnalysis.painSignal === "BULLISH" ? "border-green-800/40" : oiAnalysis.painSignal === "BEARISH" ? "border-red-800/40" : "border-gray-800/60"}`}>
+              <span>🎯</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.painNote}</span>
+            </div>
+            <div className="flex items-start gap-2 p-2.5 rounded-lg bg-gray-950/60 border border-gray-800/60">
+              <span>⚖️</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.skewNote}</span>
+            </div>
+            <div className="flex items-start gap-2 p-2.5 rounded-lg bg-gray-950/60 border border-gray-800/60">
+              <span>📍</span>
+              <span className="text-gray-300 leading-relaxed">
+                Resistance: <span className="font-bold text-red-400">{oiAnalysis.maxCeOiStrike.toLocaleString("en-IN")}</span>
+                {" "}({fmtLargeNum(oiAnalysis.maxCeOi)} CE OI)
+                {"  ·  "}
+                Support: <span className="font-bold text-green-400">{oiAnalysis.maxPeOiStrike.toLocaleString("en-IN")}</span>
+                {" "}({fmtLargeNum(oiAnalysis.maxPeOi)} PE OI)
+                {oiAnalysis.aboveResistance && <span className="text-orange-400 font-bold"> ⚠ Spot above resistance!</span>}
+                {oiAnalysis.belowSupport && <span className="text-orange-400 font-bold"> ⚠ Spot below support!</span>}
+              </span>
+            </div>
+          </div>
         </div>
       )}
 
