@@ -1,5 +1,6 @@
 .env
-data/
+/data/
+!frontend/src/data/
 __pycache__/
 *.pyc
 .venv/
