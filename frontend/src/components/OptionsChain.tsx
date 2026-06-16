@@ -1272,7 +1272,7 @@ export default function OptionsChain() {
                 {payoff && (
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={simulatedCurve} margin={{ top: 14, right: 16, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                      <CartesianGrid strokeDasharray="3 6" stroke="#1a2233" vertical={false} />
                       <XAxis dataKey="spot" stroke="#6b7280" fontSize={9}
                         tickFormatter={(v) => (v / 1000).toFixed(1) + "k"} />
                       <YAxis stroke="#6b7280" fontSize={9}
@@ -1289,34 +1289,36 @@ export default function OptionsChain() {
                       />
                       <Legend verticalAlign="top" height={22} iconType="circle" wrapperStyle={{ fontSize: "10px" }} />
 
-                      {/* SD zone fills (below lines so they appear behind) */}
-                      {sigma1 && spotPrice && (
-                        <>
-                          {/* ±1σ inner zone — subtle blue tint */}
-                          <ReferenceArea
-                            x1={Math.round(spotPrice - sigma1)} x2={Math.round(spotPrice + sigma1)}
-                            fill="rgba(99,102,241,0.06)" fillOpacity={1} />
-                          {/* 1σ→2σ outer zones — hatched purple tint */}
-                          <ReferenceArea
-                            x1={Math.round(spotPrice - sigma1 * 2)} x2={Math.round(spotPrice - sigma1)}
-                            fill="rgba(168,85,247,0.05)" fillOpacity={1} />
-                          <ReferenceArea
-                            x1={Math.round(spotPrice + sigma1)} x2={Math.round(spotPrice + sigma1 * 2)}
-                            fill="rgba(168,85,247,0.05)" fillOpacity={1} />
-                        </>
-                      )}
-
-                      {/* Red loss zone (full area below zero) */}
-                      <ReferenceArea y2={0} fill="rgba(239,68,68,0.07)" fillOpacity={1} />
-
-                      {/* Green only in profit triangle (between breakevens where expiry_pnl > 0) */}
+                      {/* Green profit zone: inside triangle (between breakevens, above zero) */}
                       {profitZones.map((z, i) => (
-                        <ReferenceArea key={i} x1={z.x1} x2={z.x2} y1={0}
-                          fill="rgba(16,185,129,0.15)" fillOpacity={1} />
+                        <ReferenceArea key={`pz-${i}`} x1={z.x1} x2={z.x2} y1={0}
+                          fill="rgba(16,185,129,0.22)" fillOpacity={1} />
                       ))}
 
+                      {/* Red loss zones: outside breakevens, below zero only */}
+                      {payoff.breakevens.length >= 1 && (
+                        <ReferenceArea x2={payoff.breakevens[0]} y2={0}
+                          fill="rgba(239,68,68,0.28)" fillOpacity={1} />
+                      )}
+                      {payoff.breakevens.length >= 2 && (
+                        <ReferenceArea x1={payoff.breakevens[payoff.breakevens.length - 1]} y2={0}
+                          fill="rgba(239,68,68,0.28)" fillOpacity={1} />
+                      )}
+                      {/* Single breakeven (debit spread etc): shade everything outside it below zero */}
+                      {payoff.breakevens.length === 1 && (
+                        <ReferenceArea x1={payoff.breakevens[0]} y2={0}
+                          fill="rgba(239,68,68,0.28)" fillOpacity={1} />
+                      )}
+
                       {/* Zero line */}
-                      <ReferenceLine y={0} stroke="#374151" strokeWidth={1} />
+                      <ReferenceLine y={0} stroke="#4b5563" strokeWidth={1} />
+
+                      {/* Breakeven vertical lines */}
+                      {payoff.breakevens.map((be, i) => (
+                        <ReferenceLine key={`be-${i}`} x={be} stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="4 3"
+                          label={{ value: `BE ${be.toLocaleString("en-IN")}`, fill: "#f59e0b", fontSize: 8,
+                            position: i === 0 ? "insideTopRight" : "insideTopLeft" }} />
+                      ))}
 
                       {/* 2σ lines */}
                       {sigma1 && spotPrice && (
@@ -1356,8 +1358,8 @@ export default function OptionsChain() {
                         );
                       })()}
 
-                      <Line type="monotone" dataKey="expiry_pnl" name="On Expiry" stroke="#10b981" strokeWidth={2.5} dot={false} />
-                      <Line type="monotone" dataKey="today_pnl" name="On Target Date" stroke="#3b82f6" strokeWidth={1.5} dot={false} strokeDasharray="5 3" />
+                      <Line type="monotone" dataKey="expiry_pnl" name="On Expiry" stroke="#22c55e" strokeWidth={3} dot={false} />
+                      <Line type="monotone" dataKey="today_pnl" name="On Target Date" stroke="#60a5fa" strokeWidth={1.5} dot={false} strokeDasharray="5 3" />
                     </LineChart>
                   </ResponsiveContainer>
                 )}
