@@ -86,58 +86,45 @@ export default function App() {
         )}
       </header>
 
-      {tab === "dashboard" && (
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-950">
-          <Dashboard />
-        </div>
-      )}
+      {/* All tabs stay mounted — only visibility toggles. State (legs, payoff, WS) survives navigation. */}
+      <div className={`flex-1 overflow-y-auto p-6 bg-gray-950 ${tab !== "dashboard" ? "hidden" : ""}`}>
+        <Dashboard />
+      </div>
 
-      {tab === "backtest" && (
-        <div className="flex flex-1 overflow-hidden">
-          <aside className="w-[380px] flex-shrink-0 border-r border-gray-800 overflow-y-auto bg-gray-900">
-            <StrategyBuilder onResult={setResult} onLoading={setBtLoading} />
-          </aside>
-          <main className="flex-1 overflow-y-auto p-6">
-            {btLoading ? (
-              <BacktestLoader />
-            ) : result ? (
-              <ResultsPanel result={result} />
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-gray-600 select-none">
-                <div className="text-7xl mb-5 opacity-30">📈</div>
-                <p className="text-base font-medium text-gray-500">Configure strategy and run backtest</p>
-                <p className="text-sm mt-1 text-gray-600">Results will appear here</p>
-              </div>
-            )}
-          </main>
-        </div>
-      )}
+      <div className={`flex flex-1 overflow-hidden ${tab !== "backtest" ? "hidden" : ""}`}>
+        <aside className="w-[380px] flex-shrink-0 border-r border-gray-800 overflow-y-auto bg-gray-900">
+          <StrategyBuilder onResult={setResult} onLoading={setBtLoading} />
+        </aside>
+        <main className="flex-1 overflow-y-auto p-6">
+          {btLoading ? (
+            <BacktestLoader />
+          ) : result ? (
+            <ResultsPanel result={result} />
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-gray-600 select-none">
+              <div className="text-7xl mb-5 opacity-30">📈</div>
+              <p className="text-base font-medium text-gray-500">Configure strategy and run backtest</p>
+              <p className="text-sm mt-1 text-gray-600">Results will appear here</p>
+            </div>
+          )}
+        </main>
+      </div>
 
-      {tab === "sweep" && (
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-950">
-          <GridSweep />
-        </div>
-      )}
-      {tab === "chain" && (
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-950">
-          <OptionsChain />
-        </div>
-      )}
-      {tab === "flow" && (
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-950">
-          <FlowMatrix />
-        </div>
-      )}
-      {tab === "institutional" && (
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-950">
-          <InstitutionalAnalytics />
-        </div>
-      )}
-      {tab === "live" && (
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-950">
-          <LiveTab />
-        </div>
-      )}
+      <div className={`flex-1 overflow-y-auto p-6 bg-gray-950 ${tab !== "sweep" ? "hidden" : ""}`}>
+        <GridSweep />
+      </div>
+      <div className={`flex-1 overflow-y-auto p-6 bg-gray-950 ${tab !== "chain" ? "hidden" : ""}`}>
+        <OptionsChain />
+      </div>
+      <div className={`flex-1 overflow-y-auto p-6 bg-gray-950 ${tab !== "flow" ? "hidden" : ""}`}>
+        <FlowMatrix />
+      </div>
+      <div className={`flex-1 overflow-y-auto p-6 bg-gray-950 ${tab !== "institutional" ? "hidden" : ""}`}>
+        <InstitutionalAnalytics />
+      </div>
+      <div className={`flex-1 overflow-y-auto p-6 bg-gray-950 ${tab !== "live" ? "hidden" : ""}`}>
+        <LiveTab />
+      </div>
     </div>
   );
 }

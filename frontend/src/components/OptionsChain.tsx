@@ -12,6 +12,7 @@ import {
 interface BuilderLeg extends PayoffLegSpec {
   id: string;
   visible: boolean;   // include this leg in the payoff visualization
+  expiry: string;     // per-leg expiry; enables calendar/diagonal spreads
 }
 
 // Current (post-1-Jan-2026 NSE revision) lot sizes — fallback only; the live
@@ -267,6 +268,12 @@ export default function OptionsChain() {
     return Math.max(1, (new Date(exp).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   }, [isLive, liveExpiry, selectedExpiry]);
 
+  // Expiries available for per-leg calendar spread selection
+  const availableExpiries = useMemo(() => {
+    if (isLive) return computeLiveExpiries(underlying);
+    return expiries.length ? expiries : computeLiveExpiries(underlying);
+  }, [isLive, underlying, expiries]);
+
   const atmIv = useMemo(() => {
     if (!data?.chain || !atmStrike) return null;
     const row = data.chain.find(r => r.strike === atmStrike);
@@ -372,13 +379,14 @@ export default function OptionsChain() {
       // Only forward the broker's authoritative lot (live). In historical mode
       // leave null so the server picks the date-correct lot from the expiry.
       lot_size: data?.lot_size ?? null,
-      legs: activeLegs.map(({ action, opt_type, strike, lots, entry_price, underlying: u }) => ({
+      legs: activeLegs.map(({ action, opt_type, strike, lots, entry_price, underlying: u, expiry: legExp }) => ({
         action,
         opt_type,
         strike,
         lots,
         entry_price,
         underlying: u,
+        expiry: legExp || activeExpiry,   // per-leg expiry enables calendar spreads
       })),
     };
 
@@ -396,6 +404,7 @@ export default function OptionsChain() {
   // Leg Builder triggers from Options Chain
   const addLeg = (strike: number, opt_type: "CE" | "PE", action: "BUY" | "SELL", entryPrice: number) => {
     const id = `leg-${Date.now()}-${strike}-${opt_type}-${action}`;
+    const chainExpiry = isLive ? liveExpiry : selectedExpiry;
     const newLeg: BuilderLeg = {
       id,
       strike,
@@ -405,6 +414,7 @@ export default function OptionsChain() {
       lots: 1,
       underlying,
       visible: true,
+      expiry: chainExpiry,
     };
     setLegs((prev) => [...prev, newLeg]);
   };
@@ -487,6 +497,7 @@ export default function OptionsChain() {
       saved.legs.map((l, i) => ({
         id: `saved-${Date.now()}-${i}`,
         visible: true,
+        expiry: l.expiry || saved.expiry,   // per-leg or fall back to strategy expiry
         ...l
       }))
     );
@@ -1200,6 +1211,7 @@ export default function OptionsChain() {
                       <th className="py-1.5 px-1 text-left">B/S</th>
                       <th className="py-1.5 px-1 text-center">Strike</th>
                       <th className="py-1.5 px-1 text-center">Type</th>
+                      <th className="py-1.5 px-1 text-center text-amber-400">Expiry</th>
                       <th className="py-1.5 px-1 text-center">Lots</th>
                       <th className="py-1.5 px-1 text-right">Entry ₹</th>
                       <th className="py-1.5 px-1 text-right">LTP</th>
@@ -1254,6 +1266,17 @@ export default function OptionsChain() {
                               className={`bg-gray-900 border border-gray-800 rounded px-1 py-0.5 text-[11px] font-bold text-center focus:outline-none focus:border-blue-600 ${leg.opt_type === "CE" ? "text-red-400" : "text-green-400"}`}>
                               <option value="CE">CE</option>
                               <option value="PE">PE</option>
+                            </select>
+                          </td>
+                          <td className="py-1.5 px-1 text-center">
+                            <select
+                              value={leg.expiry || (isLive ? liveExpiry : selectedExpiry)}
+                              onChange={(e) => handleUpdateLeg(leg.id, { expiry: e.target.value })}
+                              title="Leg expiry — change for calendar/diagonal spreads"
+                              className="bg-gray-900 border border-gray-800 rounded px-1 py-0.5 text-[10px] text-amber-300 font-mono focus:outline-none focus:border-blue-600">
+                              {availableExpiries.map((exp) => (
+                                <option key={exp} value={exp}>{exp.slice(5)}</option>
+                              ))}
                             </select>
                           </td>
                           <td className="py-1.5 px-1">

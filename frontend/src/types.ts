@@ -228,6 +228,7 @@ export interface PayoffLegSpec {
   lots: number;
   entry_price: number;
   underlying: string;
+  expiry?: string;   // per-leg expiry for calendar/diagonal spreads; omit = use chain expiry
 }
 
 export interface PayoffRequest {

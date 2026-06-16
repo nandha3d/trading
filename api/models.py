@@ -192,6 +192,7 @@ class PayoffLegSpec(BaseModel):
     lots: int = 1
     entry_price: float
     underlying: str = "NIFTY"
+    expiry: Optional[str] = None   # per-leg expiry; None = use req.expiry (for calendar/diagonal spreads)
 
 
 class PayoffRequest(BaseModel):

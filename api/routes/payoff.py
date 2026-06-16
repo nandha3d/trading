@@ -25,51 +25,64 @@ def _compute_payoff(req: PayoffRequest) -> PayoffResponse:
     if req.spot <= 0:
         raise ValueError("spot must be > 0")
 
-    exp_date = date.fromisoformat(req.expiry)
+    req_exp_date = date.fromisoformat(req.expiry)
     cur_date = date.fromisoformat(req.current_date)
-    dte_years = max((exp_date - cur_date).days, 0) / 365.0
 
     def resolve_lot(u: str) -> int:
         # client-supplied lot (from live chain / broker scrip) wins for the
         # primary underlying; else date-aware default
         if req.lot_size and u.upper() == req.underlying.upper():
             return req.lot_size
-        return _lot_size(u, exp_date)
+        return _lot_size(u, req_exp_date)
 
     spot = req.spot
     r = req.r
 
-    # Pre-resolve per-leg specs once: signed qty, IV, opt_type, strike, entry.
+    # Per-leg expiry: use leg.expiry if set, else fall back to req.expiry.
+    # primary_exp = earliest leg expiry; used as the evaluation date for expiry_pnl.
+    leg_exp_dates = [
+        date.fromisoformat(leg.expiry) if leg.expiry else req_exp_date
+        for leg in req.legs
+    ]
+    primary_exp = min(leg_exp_dates)
+    is_multi_expiry = len(set(leg_exp_dates)) > 1
+
+    # Pre-resolve per-leg specs once: signed qty, IV, DTE fields.
     legs_info = []
-    for leg in req.legs:
-        t = dte_years if dte_years > 0 else 1 / 365
+    for leg, leg_exp in zip(req.legs, leg_exp_dates):
+        dte_today = max((leg_exp - cur_date).days, 0) / 365.0
+        t = dte_today if dte_today > 0 else 1 / 365
         iv = calculate_iv(leg.entry_price, spot, leg.strike, t, r, leg.opt_type.upper())
+        dte_primary = (leg_exp - primary_exp).days / 365.0  # remaining DTE at primary expiry
         legs_info.append({
             "strike": float(leg.strike),
             "opt": leg.opt_type.upper(),
             "entry": leg.entry_price,
             "qty": leg.lots * resolve_lot(leg.underlying or req.underlying),
             "sign": -1 if leg.action.upper() == "SELL" else 1,
-            "iv": min(max(iv, 0.05), 2.0),  # clamp 5%–200%
+            "iv": min(max(iv, 0.05), 2.0),
+            "dte_today": dte_today,
+            "dte_primary": dte_primary,
         })
 
     def expiry_pnl(s: float) -> float:
-        """Exact piecewise-linear payoff at expiry (intrinsic only)."""
+        """P&L at primary expiry (earliest leg expiry).
+        Near legs → intrinsic. Far legs → BS with remaining DTE."""
         total = 0.0
         for li in legs_info:
-            if li["opt"] == "CE":
-                intrinsic = max(0.0, s - li["strike"])
+            if li["dte_primary"] <= 0:
+                val = max(0.0, s - li["strike"]) if li["opt"] == "CE" else max(0.0, li["strike"] - s)
             else:
-                intrinsic = max(0.0, li["strike"] - s)
-            total += li["sign"] * (intrinsic - li["entry"]) * li["qty"]
+                val = bs_price(s, li["strike"], li["dte_primary"], r, li["iv"], li["opt"])
+            total += li["sign"] * (val - li["entry"]) * li["qty"]
         return total
 
     def today_pnl(s: float) -> float:
-        """Theoretical P&L on the target date (Black-Scholes)."""
+        """Theoretical P&L on the current/selected date (each leg at its own DTE)."""
         total = 0.0
         for li in legs_info:
-            if dte_years > 0:
-                mkt = bs_price(s, li["strike"], dte_years, r, li["iv"], li["opt"])
+            if li["dte_today"] > 0:
+                mkt = bs_price(s, li["strike"], li["dte_today"], r, li["iv"], li["opt"])
             else:
                 mkt = max(0.0, s - li["strike"]) if li["opt"] == "CE" else max(0.0, li["strike"] - s)
             total += li["sign"] * (mkt - li["entry"]) * li["qty"]
@@ -82,8 +95,6 @@ def _compute_payoff(req: PayoffRequest) -> PayoffResponse:
     raw = [spot * (1 - pct_range + 2 * pct_range * i / n_steps) for i in range(n_steps + 1)]
     lo, hi = raw[0], raw[-1]
     raw += [k for k in strikes if lo < k < hi]   # land an exact sample on every kink
-    # Snap to 2 decimals and dedup so the injected strike never sits a hair away
-    # from a grid point (which would render as a tiny vertical kink).
     spots = sorted({round(s, 2) for s in raw})
 
     curve = [
@@ -92,20 +103,28 @@ def _compute_payoff(req: PayoffRequest) -> PayoffResponse:
         for s in spots
     ]
 
-    # ---- analytic max profit / max loss (extrema of a piecewise-linear curve
-    # occur only at kinks; unbounded sides are detected from the tail slope) ----
+    # ---- max profit / max loss ----
+    # Unbounded detection: tail slopes beyond outermost strike
     min_k, max_k = strikes[0], strikes[-1]
-    slope_below = expiry_pnl(min_k - 1.0) - expiry_pnl(min_k - 2.0)   # d/dS, S < all strikes
-    slope_above = expiry_pnl(max_k + 2.0) - expiry_pnl(max_k + 1.0)   # d/dS, S > all strikes
+    slope_below = expiry_pnl(min_k - 1.0) - expiry_pnl(min_k - 2.0)
+    slope_above = expiry_pnl(max_k + 2.0) - expiry_pnl(max_k + 1.0)
     eps = 1e-6
-    unbounded_profit = slope_below < -eps or slope_above > eps        # rises without limit
-    unbounded_loss = slope_below > eps or slope_above < -eps          # falls without limit
+    unbounded_profit = slope_below < -eps or slope_above > eps
+    unbounded_loss   = slope_below > eps  or slope_above < -eps
 
-    kink_pnls = [expiry_pnl(k) for k in strikes]
-    max_profit = None if unbounded_profit else round(max(kink_pnls), 2)
-    max_loss = None if unbounded_loss else round(min(kink_pnls), 2)
+    if is_multi_expiry:
+        # Far leg has BS value at primary_exp → curve is smooth, not piecewise-linear.
+        # Use dense grid (all spots already include kinks) for extrema.
+        expiry_vals = [p.expiry_pnl for p in curve]
+        max_profit = None if unbounded_profit else round(max(expiry_vals), 2)
+        max_loss   = None if unbounded_loss   else round(min(expiry_vals), 2)
+    else:
+        # Single expiry: piecewise-linear → extrema only at strike kinks (exact).
+        kink_pnls = [expiry_pnl(k) for k in strikes]
+        max_profit = None if unbounded_profit else round(max(kink_pnls), 2)
+        max_loss   = None if unbounded_loss   else round(min(kink_pnls), 2)
 
-    # ---- breakevens: exact zero crossings (segments are linear, so interp is exact) ----
+    # ---- breakevens: exact zero crossings ----
     breakevens: list[float] = []
     for i in range(len(curve) - 1):
         p1, p2 = curve[i].expiry_pnl, curve[i + 1].expiry_pnl
@@ -120,10 +139,10 @@ def _compute_payoff(req: PayoffRequest) -> PayoffResponse:
         (1 if li["sign"] == -1 else -1) * li["entry"] * li["qty"] for li in legs_info
     )
 
-    # ---- net Greeks at current spot ----
+    # ---- net Greeks at current spot (each leg at its own DTE from cur_date) ----
     ng = {"delta": 0.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0}
-    t0 = dte_years if dte_years > 0 else 1 / 365
     for li in legs_info:
+        t0 = li["dte_today"] if li["dte_today"] > 0 else 1 / 365
         g = calculate_greeks(spot, li["strike"], t0, r, li["iv"], li["opt"])
         for k in ng:
             ng[k] += li["sign"] * g[k] * li["qty"]
