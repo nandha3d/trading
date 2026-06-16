@@ -38,86 +38,101 @@ def _compute_payoff(req: PayoffRequest) -> PayoffResponse:
 
     spot = req.spot
     r = req.r
-    n_steps = 80
-    pct_range = 0.12  # ±12% from spot
-    spots = [spot * (1 - pct_range + 2 * pct_range * i / n_steps) for i in range(n_steps + 1)]
-    # Inject unique strike prices so the triangle peak lands exactly at the right spot
-    unique_strikes = sorted({leg.strike for leg in req.legs})
-    lo, hi = spots[0], spots[-1]
-    for k in unique_strikes:
-        if lo < k < hi:
-            spots.append(float(k))
-    spots.sort()
 
-    # Per-leg: resolve IV from entry_price at current spot
-    leg_ivs: list[float] = []
+    # Pre-resolve per-leg specs once: signed qty, IV, opt_type, strike, entry.
+    legs_info = []
     for leg in req.legs:
         t = dte_years if dte_years > 0 else 1 / 365
         iv = calculate_iv(leg.entry_price, spot, leg.strike, t, r, leg.opt_type.upper())
-        leg_ivs.append(min(max(iv, 0.05), 2.0))  # clamp: 5%–200%
+        legs_info.append({
+            "strike": float(leg.strike),
+            "opt": leg.opt_type.upper(),
+            "entry": leg.entry_price,
+            "qty": leg.lots * resolve_lot(leg.underlying or req.underlying),
+            "sign": -1 if leg.action.upper() == "SELL" else 1,
+            "iv": min(max(iv, 0.05), 2.0),  # clamp 5%–200%
+        })
 
-    curve: list[PayoffPoint] = []
-    for s in spots:
-        expiry_pnl = 0.0
-        today_pnl = 0.0
-        for leg, sigma in zip(req.legs, leg_ivs):
-            lot = resolve_lot(leg.underlying or req.underlying)
-            qty = leg.lots * lot
-            sign = -1 if leg.action.upper() == "SELL" else 1
-
-            if leg.opt_type.upper() == "CE":
-                intrinsic = max(0.0, s - leg.strike)
+    def expiry_pnl(s: float) -> float:
+        """Exact piecewise-linear payoff at expiry (intrinsic only)."""
+        total = 0.0
+        for li in legs_info:
+            if li["opt"] == "CE":
+                intrinsic = max(0.0, s - li["strike"])
             else:
-                intrinsic = max(0.0, leg.strike - s)
+                intrinsic = max(0.0, li["strike"] - s)
+            total += li["sign"] * (intrinsic - li["entry"]) * li["qty"]
+        return total
 
-            expiry_pnl += sign * (intrinsic - leg.entry_price) * qty
-
+    def today_pnl(s: float) -> float:
+        """Theoretical P&L on the target date (Black-Scholes)."""
+        total = 0.0
+        for li in legs_info:
             if dte_years > 0:
-                mkt = bs_price(s, leg.strike, dte_years, r, sigma, leg.opt_type.upper())
+                mkt = bs_price(s, li["strike"], dte_years, r, li["iv"], li["opt"])
             else:
-                mkt = intrinsic
-            today_pnl += sign * (mkt - leg.entry_price) * qty
+                mkt = max(0.0, s - li["strike"]) if li["opt"] == "CE" else max(0.0, li["strike"] - s)
+            total += li["sign"] * (mkt - li["entry"]) * li["qty"]
+        return total
 
-        curve.append(PayoffPoint(
-            spot=round(s, 2),
-            expiry_pnl=round(expiry_pnl, 2),
-            today_pnl=round(today_pnl, 2),
-        ))
+    # ---- chart curve: uniform grid + exact strike kinks (no sampling artifacts) ----
+    n_steps = 100
+    pct_range = 0.15  # ±15% from spot
+    strikes = sorted({li["strike"] for li in legs_info})
+    spots = [spot * (1 - pct_range + 2 * pct_range * i / n_steps) for i in range(n_steps + 1)]
+    lo, hi = spots[0], spots[-1]
+    for k in strikes:                       # land an exact sample on every kink
+        if lo < k < hi:
+            spots.append(k)
+    spots = sorted(set(spots))
 
-    # Breakevens: zero crossings in expiry curve
-    expiry_vals = [p.expiry_pnl for p in curve]
+    curve = [
+        PayoffPoint(spot=round(s, 2), expiry_pnl=round(expiry_pnl(s), 2),
+                    today_pnl=round(today_pnl(s), 2))
+        for s in spots
+    ]
+
+    # ---- analytic max profit / max loss (extrema of a piecewise-linear curve
+    # occur only at kinks; unbounded sides are detected from the tail slope) ----
+    min_k, max_k = strikes[0], strikes[-1]
+    slope_below = expiry_pnl(min_k - 1.0) - expiry_pnl(min_k - 2.0)   # d/dS, S < all strikes
+    slope_above = expiry_pnl(max_k + 2.0) - expiry_pnl(max_k + 1.0)   # d/dS, S > all strikes
+    eps = 1e-6
+    unbounded_profit = slope_below < -eps or slope_above > eps        # rises without limit
+    unbounded_loss = slope_below > eps or slope_above < -eps          # falls without limit
+
+    kink_pnls = [expiry_pnl(k) for k in strikes]
+    max_profit = None if unbounded_profit else round(max(kink_pnls), 2)
+    max_loss = None if unbounded_loss else round(min(kink_pnls), 2)
+
+    # ---- breakevens: exact zero crossings (segments are linear, so interp is exact) ----
     breakevens: list[float] = []
-    for i in range(len(expiry_vals) - 1):
-        p1, p2 = expiry_vals[i], expiry_vals[i + 1]
-        if p1 * p2 <= 0 and p2 - p1 != 0:
-            be = spots[i] + (0 - p1) * (spots[i + 1] - spots[i]) / (p2 - p1)
-            breakevens.append(round(be, 2))
+    for i in range(len(curve) - 1):
+        p1, p2 = curve[i].expiry_pnl, curve[i + 1].expiry_pnl
+        if p1 == 0.0:
+            breakevens.append(round(curve[i].spot, 2))
+        elif p1 * p2 < 0:
+            s1, s2 = curve[i].spot, curve[i + 1].spot
+            breakevens.append(round(s1 + (0 - p1) * (s2 - s1) / (p2 - p1), 2))
+    breakevens = sorted(set(breakevens))
 
-    max_profit = max(expiry_vals)
-    max_loss = min(expiry_vals)
+    net_premium = sum(
+        (1 if li["sign"] == -1 else -1) * li["entry"] * li["qty"] for li in legs_info
+    )
 
-    net_premium = 0.0
-    for leg in req.legs:
-        lot = resolve_lot(leg.underlying or req.underlying)
-        qty = leg.lots * lot
-        sign = 1 if leg.action.upper() == "SELL" else -1
-        net_premium += sign * leg.entry_price * qty
-
+    # ---- net Greeks at current spot ----
     ng = {"delta": 0.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0}
     t0 = dte_years if dte_years > 0 else 1 / 365
-    for leg, sigma in zip(req.legs, leg_ivs):
-        lot = resolve_lot(leg.underlying or req.underlying)
-        qty = leg.lots * lot
-        sign = -1 if leg.action.upper() == "SELL" else 1
-        g = calculate_greeks(spot, leg.strike, t0, r, sigma, leg.opt_type.upper())
+    for li in legs_info:
+        g = calculate_greeks(spot, li["strike"], t0, r, li["iv"], li["opt"])
         for k in ng:
-            ng[k] += sign * g[k] * qty
+            ng[k] += li["sign"] * g[k] * li["qty"]
 
     return PayoffResponse(
         curve=curve,
         breakevens=breakevens,
-        max_profit=round(max_profit, 2),
-        max_loss=round(max_loss, 2),
+        max_profit=max_profit,
+        max_loss=max_loss,
         net_premium=round(net_premium, 2),
         net_greeks=NetGreeks(**{k: round(v, 4) for k, v in ng.items()}),
     )

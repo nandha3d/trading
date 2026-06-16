@@ -256,8 +256,8 @@ export interface NetGreeks {
 export interface PayoffResponse {
   curve: PayoffPoint[];
   breakevens: number[];
-  max_profit: number;
-  max_loss: number;
+  max_profit: number | null;   // null = unbounded ("Unlimited")
+  max_loss: number | null;     // null = unbounded
   net_premium: number;
   net_greeks: NetGreeks;
 }

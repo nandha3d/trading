@@ -220,8 +220,8 @@ class NetGreeks(BaseModel):
 class PayoffResponse(BaseModel):
     curve: list[PayoffPoint]
     breakevens: list[float]
-    max_profit: float
-    max_loss: float
+    max_profit: Optional[float] = None   # None = unbounded (frontend shows "Unlimited")
+    max_loss: Optional[float] = None     # None = unbounded
     net_premium: float
     net_greeks: NetGreeks
 
