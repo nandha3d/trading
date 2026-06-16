@@ -1,0 +1,35 @@
+name: Deploy to production
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            cd /opt/trading
+
+            # Pull latest code
+            git pull origin main
+
+            # Install any new Python deps
+            .venv/bin/pip install -r requirements.txt -q
+
+            # Rebuild frontend if changed
+            cd frontend
+            npm install --silent
+            npm run build
+            cd ..
+
+            # Restart API
+            systemctl restart trading
+            echo "Deploy complete — $(date)"
