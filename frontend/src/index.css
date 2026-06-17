@@ -2,12 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design Tokens ─────────────────────────────────────────────
+   All UI colours reference these variables.
+   Override :root for light mode — no component edits needed.
+   ─────────────────────────────────────────────────────────────*/
+:root {
+  --ts-bg-base:     #0d0f14;
+  --ts-bg-surface:  #111318;
+  --ts-bg-card:     #151820;
+  --ts-bg-elevated: #1c2232;
+  --ts-border:      rgba(255,255,255,0.08);
+  --ts-border-strong: rgba(255,255,255,0.14);
+
+  --ts-text:           #e2e8f0;
+  --ts-text-secondary: #94a3b8;
+  --ts-muted:          #546278;
+
+  --ts-accent:  #3b82f6;
+  --ts-profit:  #22c55e;
+  --ts-loss:    #ef4444;
+  --ts-warning: #f59e0b;
+
+  --ts-buy-bg:     rgba(16,185,129,0.10);
+  --ts-buy-border: rgba(16,185,129,0.35);
+  --ts-buy-text:   #34d399;
+  --ts-sell-bg:    rgba(239,68,68,0.10);
+  --ts-sell-border:rgba(239,68,68,0.35);
+  --ts-sell-text:  #f87171;
+}
+
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background-color: #0f1117;
-  color: #e5e7eb;
+  background-color: var(--ts-bg-base);
+  color: var(--ts-text);
   font-family: system-ui, -apple-system, sans-serif;
 }
 

@@ -20,7 +20,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "oi-matrix", label: "OI Matrix" },
   { id: "backtest", label: "Backtest" },
   { id: "sweep", label: "Auto Sweep" },
-  { id: "chain", label: "Options Chain" },
+  { id: "chain", label: "Trade Simulator" },
 ];
 
 export default function App() {
