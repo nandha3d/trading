@@ -22,7 +22,7 @@ interface BuilderLeg extends PayoffLegSpec {
   tp_pct?: number;        // % of entry premium for take-profit trigger
 }
 
-// Current (post-1-Jan-2026 NSE revision) lot sizes â€” fallback only; the live
+// Current (post-1-Jan-2026 NSE revision) lot sizes — fallback only; the live
 // chain payload carries the broker's authoritative lot_size when available.
 const LOT_SIZES: Record<string, number> = { NIFTY: 65, BANKNIFTY: 30, FINNIFTY: 60, MIDCPNIFTY: 120 };
 
@@ -130,13 +130,13 @@ export default function OptionsChain() {
     return now.getHours() * 60 + now.getMinutes() >= 15 * 60 + 30 ? 930 : 560;
   });
   
-  // After 15:30 market is closed â€” no live needed
+  // After 15:30 market is closed — no live needed
   const isMarketClosed = (): boolean => {
     const now = new Date();
     return now.getHours() * 60 + now.getMinutes() >= 15 * 60 + 30;
   };
 
-  // Live Feed toggle â€” force historical after market close
+  // Live Feed toggle — force historical after market close
   const [isLive, setIsLive] = useState(
     () => !isMarketClosed() && localStorage.getItem("oc_isLive") !== "false"
   );
@@ -190,7 +190,7 @@ export default function OptionsChain() {
     loadSaved();
   }, []);
 
-  // Debounce slider â†’ triggers payoff recalc 500 ms after slider stops moving
+  // Debounce slider → triggers payoff recalc 500 ms after slider stops moving
   useEffect(() => {
     if (isLive) return;
     const t = setTimeout(() => setDebouncedSlider(sliderVal), 500);
@@ -209,7 +209,7 @@ export default function OptionsChain() {
     return () => clearInterval(tick);
   }, [isLive]);
 
-  // Change date â†’ auto-pick nearest valid expiry for that date from DB
+  // Change date → auto-pick nearest valid expiry for that date from DB
   const handleDateChange = (newDate: string) => {
     // When navigating to today after close, jump slider to 15:30 for EOD data
     const now = new Date();
@@ -253,7 +253,7 @@ export default function OptionsChain() {
   };
 
   // 1. On mount or underlying change: date-first init.
-  //    Find the latest date with any data â†’ auto-pick expiry â†’ load trade dates.
+  //    Find the latest date with any data → auto-pick expiry → load trade dates.
   //    Also load full expiry list for the dropdown.
   useEffect(() => {
     // Load all expiries for dropdown
@@ -293,7 +293,7 @@ export default function OptionsChain() {
   }, [underlying]);
 
   // 2. When expiry changes manually (user picks from dropdown), reload trade dates
-  //    but don't reset selectedDate â€” keep current date if valid.
+  //    but don't reset selectedDate — keep current date if valid.
   const prevExpiry = useRef<string>("");
   useEffect(() => {
     if (!selectedExpiry || selectedExpiry === prevExpiry.current) return;
@@ -356,7 +356,7 @@ export default function OptionsChain() {
       } catch { /* ignore parse errors */ }
     };
 
-    ws.onerror = () => setError("Live feed connection error â€” retrying on next change.");
+    ws.onerror = () => setError("Live feed connection error — retrying on next change.");
     ws.onclose = () => {
       if (isLive) setTimeout(() => setWsReconnect(n => n + 1), 3000);
     };
@@ -378,7 +378,7 @@ export default function OptionsChain() {
     }).strike;
   }, [spotPrice, data]);
 
-  // Ïƒ bands for payoff chart
+  // σ bands for payoff chart
   const daysToExpiry = useMemo(() => {
     const exp = isLive ? liveExpiry : selectedExpiry;
     if (!exp) return 30;
@@ -678,25 +678,25 @@ export default function OptionsChain() {
     // PCR signal
     let pcrSignal: "BULLISH" | "BEARISH" | "NEUTRAL";
     let pcrNote: string;
-    if (pcr > 1.3)       { pcrSignal = "BULLISH"; pcrNote = `PCR ${pcr.toFixed(2)} â€” heavy put writing, bulls in control`; }
-    else if (pcr > 1.0)  { pcrSignal = "NEUTRAL";  pcrNote = `PCR ${pcr.toFixed(2)} â€” mild put dominance, slight bullish bias`; }
-    else if (pcr > 0.8)  { pcrSignal = "NEUTRAL";  pcrNote = `PCR ${pcr.toFixed(2)} â€” balanced OI, range-bound likely`; }
-    else                 { pcrSignal = "BEARISH"; pcrNote = `PCR ${pcr.toFixed(2)} â€” call writing dominates, bears in control`; }
+    if (pcr > 1.3)       { pcrSignal = "BULLISH"; pcrNote = `PCR ${pcr.toFixed(2)} — heavy put writing, bulls in control`; }
+    else if (pcr > 1.0)  { pcrSignal = "NEUTRAL";  pcrNote = `PCR ${pcr.toFixed(2)} — mild put dominance, slight bullish bias`; }
+    else if (pcr > 0.8)  { pcrSignal = "NEUTRAL";  pcrNote = `PCR ${pcr.toFixed(2)} — balanced OI, range-bound likely`; }
+    else                 { pcrSignal = "BEARISH"; pcrNote = `PCR ${pcr.toFixed(2)} — call writing dominates, bears in control`; }
 
     // Max Pain vs Spot
     const painPct = ((spotPrice - max_pain) / max_pain) * 100;
     let painSignal: "BULLISH" | "BEARISH" | "NEUTRAL";
     let painNote: string;
-    if (painPct > 1.5)       { painSignal = "BEARISH"; painNote = `Spot ${painPct.toFixed(1)}% above Max Pain ${max_pain.toLocaleString("en-IN")} â€” gravity pull DOWN`; }
-    else if (painPct < -1.5) { painSignal = "BULLISH"; painNote = `Spot ${Math.abs(painPct).toFixed(1)}% below Max Pain ${max_pain.toLocaleString("en-IN")} â€” gravity pull UP`; }
-    else                     { painSignal = "NEUTRAL";  painNote = `Spot near Max Pain ${max_pain.toLocaleString("en-IN")} â€” market at equilibrium`; }
+    if (painPct > 1.5)       { painSignal = "BEARISH"; painNote = `Spot ${painPct.toFixed(1)}% above Max Pain ${max_pain.toLocaleString("en-IN")} — gravity pull DOWN`; }
+    else if (painPct < -1.5) { painSignal = "BULLISH"; painNote = `Spot ${Math.abs(painPct).toFixed(1)}% below Max Pain ${max_pain.toLocaleString("en-IN")} — gravity pull UP`; }
+    else                     { painSignal = "NEUTRAL";  painNote = `Spot near Max Pain ${max_pain.toLocaleString("en-IN")} — market at equilibrium`; }
 
     // OI skew
     const skewPct = total_ce_oi + total_pe_oi > 0 ? ((total_pe_oi - total_ce_oi) / (total_pe_oi + total_ce_oi)) * 100 : 0;
     let skewNote: string;
-    if (skewPct > 10)       skewNote = `PE OI ${skewPct.toFixed(0)}% heavier â€” strong put base, market supported`;
-    else if (skewPct < -10) skewNote = `CE OI ${Math.abs(skewPct).toFixed(0)}% heavier â€” call wall overhead, market capped`;
-    else                    skewNote = `CE/PE OI balanced (skew ${skewPct.toFixed(0)}%) â€” no directional bias from writing`;
+    if (skewPct > 10)       skewNote = `PE OI ${skewPct.toFixed(0)}% heavier — strong put base, market supported`;
+    else if (skewPct < -10) skewNote = `CE OI ${Math.abs(skewPct).toFixed(0)}% heavier — call wall overhead, market capped`;
+    else                    skewNote = `CE/PE OI balanced (skew ${skewPct.toFixed(0)}%) — no directional bias from writing`;
 
     // Key levels from OI
     let maxCeOiStrike = 0, maxCeOi = 0, maxPeOiStrike = 0, maxPeOi = 0;
@@ -764,7 +764,7 @@ export default function OptionsChain() {
     return `${legs.length} Leg Strategy`;
   }, [legs]);
 
-  // SL / TP levels in â‚¹ (based on net premium of the position)
+  // SL / TP levels in ₹ (based on net premium of the position)
   const premium = payoff ? Math.abs(payoff.net_premium) : 0;
   const slLevel = slEnabled && payoff ? -(premium * slPct / 100) : null;
   const tpLevel = tpEnabled && payoff ? (premium * tpPct / 100) : null;
@@ -776,7 +776,7 @@ export default function OptionsChain() {
       {error && (
         <div className="bg-red-900/20 border border-red-500/40 text-red-300 px-4 py-3 rounded-xl text-xs flex justify-between items-center">
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300 font-bold ml-2">âœ•</button>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300 font-bold ml-2">✕</button>
         </div>
       )}
       
@@ -842,7 +842,7 @@ export default function OptionsChain() {
                 <span className="text-xs text-gray-500">Date</span>
                 <button onClick={() => goDay(-1)}
                   className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-600 rounded text-xs text-gray-400"
-                  title="Previous trading day">â—€</button>
+                  title="Previous trading day">◀</button>
                 <input type="date" value={selectedDate}
                   onChange={(e) => handleDateChange(e.target.value)}
                   max={localDateStr(new Date())}
@@ -850,11 +850,11 @@ export default function OptionsChain() {
                 <button onClick={() => goDay(1)}
                   disabled={selectedDate >= localDateStr(new Date())}
                   className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-600 rounded text-xs text-gray-400 disabled:opacity-30"
-                  title="Next trading day">â–¶</button>
+                  title="Next trading day">▶</button>
               </div>
             )}
 
-            {/* Live Today Toggle â€” disabled after market close */}
+            {/* Live Today Toggle — disabled after market close */}
             <button
               onClick={() => {
                 // After 15:30 market is closed: switch to historical with latest data
@@ -875,7 +875,7 @@ export default function OptionsChain() {
                   handleDateChange(latest);
                 }
               }}
-              title={isMarketClosed() ? "Market closed â€” showing last available data" : "Stream today's live market session"}
+              title={isMarketClosed() ? "Market closed — showing last available data" : "Stream today's live market session"}
               className={`px-4 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-2 border transition-all ${
                 isLive
                   ? "bg-green-600/20 border-green-500/40 text-green-300 shadow-md shadow-green-950/40"
@@ -898,7 +898,7 @@ export default function OptionsChain() {
                         : "bg-emerald-600/15 border-emerald-500/40 text-emerald-300"
                 }`}>
                   <span className={`w-1.5 h-1.5 rounded-full inline-block ${stale ? "bg-amber-400" : "bg-emerald-400 animate-pulse"}`} />
-                  {stale ? "LAST FETCHED" : `LIVE Â· ${src}`}
+                  {stale ? "LAST FETCHED" : `LIVE · ${src}`}
                   {data?.timestamp && (
                     <span className="text-gray-400 font-mono font-normal ml-1">
                       {new Date(data.timestamp).toLocaleTimeString("en-IN", { hour12: false })}
@@ -917,7 +917,7 @@ export default function OptionsChain() {
               onClick={() => setShowSavedList(!showSavedList)}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-750 transition-all"
             >
-              ðŸ’¼ Saved Workspaces ({savedStrategies.length})
+              💼 Saved Workspaces ({savedStrategies.length})
             </button>
 
             <div className="flex bg-gray-950 rounded-lg p-1 border border-gray-700">
@@ -932,7 +932,7 @@ export default function OptionsChain() {
                       : "text-gray-500 hover:text-gray-300"
                   }`}
                 >
-                  {mode === "ATM_5" ? "ATM Â± 5" : mode === "ATM_10" ? "ATM Â± 10" : "All"}
+                  {mode === "ATM_5" ? "ATM ± 5" : mode === "ATM_10" ? "ATM ± 10" : "All"}
                 </button>
               ))}
             </div>
@@ -984,14 +984,14 @@ export default function OptionsChain() {
             <div className="flex items-center gap-1.5 border-r border-gray-800 pr-3">
               <button onClick={() => goDay(-1)}
                 className="w-7 h-7 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-600 rounded-lg text-xs text-gray-400"
-                title="Previous day">â—€</button>
+                title="Previous day">◀</button>
               <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 min-w-[88px] text-center">
-                {selectedDate || "â€”"}
+                {selectedDate || "—"}
               </span>
               <button onClick={() => goDay(1)}
                 disabled={!selectedDate || selectedDate >= localDateStr(new Date())}
                 className="w-7 h-7 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-600 rounded-lg text-xs text-gray-400 disabled:opacity-30"
-                title="Next day">â–¶</button>
+                title="Next day">▶</button>
             </div>
 
             {/* Time display */}
@@ -1005,12 +1005,12 @@ export default function OptionsChain() {
             {/* Time slider */}
             <div className="flex-1 flex items-center gap-2 min-w-[200px]">
               <button onClick={() => setSliderVal((v) => Math.max(555, v - 1))} disabled={sliderVal <= 555}
-                className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-700 rounded text-xs text-gray-400 disabled:opacity-30">â—€</button>
+                className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-700 rounded text-xs text-gray-400 disabled:opacity-30">◀</button>
               <input type="range" min={555} max={930} value={sliderVal}
                 onChange={(e) => setSliderVal(Number(e.target.value))}
                 className="flex-1 accent-blue-500 h-1 bg-gray-800 rounded-lg cursor-pointer" />
               <button onClick={() => setSliderVal((v) => Math.min(930, v + 1))} disabled={sliderVal >= 930}
-                className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-700 rounded text-xs text-gray-400 disabled:opacity-30">â–¶</button>
+                className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-700 rounded text-xs text-gray-400 disabled:opacity-30">▶</button>
             </div>
 
             {/* Time presets */}
@@ -1029,7 +1029,7 @@ export default function OptionsChain() {
       {/* Saved Strategy list overlay panel */}
       {showSavedList && (
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-2xl relative">
-          <button onClick={() => setShowSavedList(false)} className="absolute top-3 right-4 text-gray-450 hover:text-white text-xs font-semibold">âœ• Close</button>
+          <button onClick={() => setShowSavedList(false)} className="absolute top-3 right-4 text-gray-450 hover:text-white text-xs font-semibold">✕ Close</button>
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Saved Strategies Workspace</h3>
           {savedStrategies.length === 0 ? (
             <p className="text-xs text-gray-500">No saved strategy templates found in database. Build a strategy and save it below!</p>
@@ -1044,7 +1044,7 @@ export default function OptionsChain() {
                   <div>
                     <h4 className="text-sm font-bold text-blue-400">{saved.name}</h4>
                     <div className="text-[10px] text-gray-500 font-mono mt-1">
-                      {saved.underlying} Â· Expiry: {saved.expiry}
+                      {saved.underlying} · Expiry: {saved.expiry}
                     </div>
                     <div className="mt-2.5 flex flex-wrap gap-1">
                       {saved.legs.map((l, idx) => (
@@ -1099,30 +1099,30 @@ export default function OptionsChain() {
               oiAnalysis.verdict === "BEARISH" ? "bg-red-900/50 text-red-400 border-red-700/50" :
               "bg-yellow-900/30 text-yellow-400 border-yellow-700/40"
             }`}>
-              {oiAnalysis.verdict === "BULLISH" ? "â†‘ BULLISH" : oiAnalysis.verdict === "BEARISH" ? "â†“ BEARISH" : "â†’ NEUTRAL"}
+              {oiAnalysis.verdict === "BULLISH" ? "↑ BULLISH" : oiAnalysis.verdict === "BEARISH" ? "↓ BEARISH" : "→ NEUTRAL"}
             </span>
             <span className="text-[10px] text-gray-600 italic">Based on live OI positioning</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
             <div className={`flex items-start gap-2 p-2.5 rounded-lg bg-gray-950/60 border ${oiAnalysis.pcrSignal === "BULLISH" ? "border-green-800/40" : oiAnalysis.pcrSignal === "BEARISH" ? "border-red-800/40" : "border-gray-800/60"}`}>
-              <span>ðŸ“Š</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.pcrNote}</span>
+              <span>📊</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.pcrNote}</span>
             </div>
             <div className={`flex items-start gap-2 p-2.5 rounded-lg bg-gray-950/60 border ${oiAnalysis.painSignal === "BULLISH" ? "border-green-800/40" : oiAnalysis.painSignal === "BEARISH" ? "border-red-800/40" : "border-gray-800/60"}`}>
-              <span>ðŸŽ¯</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.painNote}</span>
+              <span>🎯</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.painNote}</span>
             </div>
             <div className="flex items-start gap-2 p-2.5 rounded-lg bg-gray-950/60 border border-gray-800/60">
-              <span>âš–ï¸</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.skewNote}</span>
+              <span>⚖️</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.skewNote}</span>
             </div>
             <div className="flex items-start gap-2 p-2.5 rounded-lg bg-gray-950/60 border border-gray-800/60">
-              <span>ðŸ“</span>
+              <span>📍</span>
               <span className="text-gray-300 leading-relaxed">
                 Resistance: <span className="font-bold text-red-400">{oiAnalysis.maxCeOiStrike.toLocaleString("en-IN")}</span>
                 {" "}({fmtLargeNum(oiAnalysis.maxCeOi)} CE OI)
-                {"  Â·  "}
+                {"  ·  "}
                 Support: <span className="font-bold text-green-400">{oiAnalysis.maxPeOiStrike.toLocaleString("en-IN")}</span>
                 {" "}({fmtLargeNum(oiAnalysis.maxPeOi)} PE OI)
-                {oiAnalysis.aboveResistance && <span className="text-orange-400 font-bold"> âš  Spot above resistance!</span>}
-                {oiAnalysis.belowSupport && <span className="text-orange-400 font-bold"> âš  Spot below support!</span>}
+                {oiAnalysis.aboveResistance && <span className="text-orange-400 font-bold"> ⚠ Spot above resistance!</span>}
+                {oiAnalysis.belowSupport && <span className="text-orange-400 font-bold"> ⚠ Spot below support!</span>}
               </span>
             </div>
           </div>
@@ -1358,7 +1358,7 @@ export default function OptionsChain() {
           </div>
 
           <div className="bg-gray-950 border border-gray-850 rounded-lg p-3 text-[11px] text-gray-400 space-y-2 leading-relaxed">
-            <h4 className="font-semibold text-gray-300">ðŸ’¡ Opstra Workspace Guide:</h4>
+            <h4 className="font-semibold text-gray-300">💡 Opstra Workspace Guide:</h4>
             <p>
               Click **B** (Buy) or **S** (Sell) buttons next to the CE/PE prices in the table to instantly add option legs into the Strategy Workspace below.
             </p>
@@ -1366,7 +1366,7 @@ export default function OptionsChain() {
         </div>
       </div>
 
-      {/* â•â• TRADE SIMULATOR WORKSPACE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* ══ TRADE SIMULATOR WORKSPACE ════════════════════════════════════════ */}
       {legs.length > 0 && (
         <div style={{ border: "1px solid var(--ts-border)", background: "var(--ts-bg-card)", borderRadius: "18px", overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.5)" }}>
 
@@ -1375,7 +1375,7 @@ export default function OptionsChain() {
             className="flex items-center gap-3 px-5 py-3 flex-wrap">
             <div className="flex items-center gap-2 min-w-0">
               <span style={{ color: "var(--ts-text)", fontSize: "16px", fontWeight: 800 }}>{detectedStrategy}</span>
-              <span style={{ color: "var(--ts-muted)", fontSize: "13px" }}>Â· {legs.length} leg{legs.length > 1 ? "s" : ""}</span>
+              <span style={{ color: "var(--ts-muted)", fontSize: "13px" }}>· {legs.length} leg{legs.length > 1 ? "s" : ""}</span>
               {spotPrice && (
                 <span style={{ color: "var(--ts-text-secondary)", fontFamily: "monospace", fontSize: "13px", marginLeft: "8px" }}>
                   SPOT {fmtPrice(spotPrice)}
@@ -1385,7 +1385,7 @@ export default function OptionsChain() {
             <div className="flex items-center gap-2 ml-auto flex-wrap">
               <input
                 type="text"
-                placeholder="Name this strategyâ€¦"
+                placeholder="Name this strategy…"
                 value={strategyName}
                 onChange={e => setStrategyName(e.target.value)}
                 className="placeholder-gray-600"
@@ -1420,7 +1420,7 @@ export default function OptionsChain() {
                       className="px-3 py-2 hover:border-blue-500/50 transition-colors"
                       onClick={() => handleLoadStrategy(s)}>
                       <div style={{ color: "var(--ts-text)", fontWeight: 700, fontSize: "13px" }}>{s.name}</div>
-                      <div style={{ color: "var(--ts-muted)", fontSize: "11px" }}>{s.underlying} Â· {s.expiry} Â· {s.legs.length} legs</div>
+                      <div style={{ color: "var(--ts-muted)", fontSize: "11px" }}>{s.underlying} · {s.expiry} · {s.legs.length} legs</div>
                       <button onClick={e => handleDeleteSaved(s.id, e)}
                         style={{ color: "var(--ts-loss)", fontSize: "11px", marginTop: "4px", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
                         Delete
@@ -1435,11 +1435,11 @@ export default function OptionsChain() {
           {/* Two-panel body */}
           <div className="grid grid-cols-1 xl:grid-cols-5">
 
-            {/* â”€â”€ LEFT: Leg card strip (2/5) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ── LEFT: Leg card strip (2/5) ───────────────────────────────────── */}
             <div className="xl:col-span-2 flex flex-col" style={{ borderRight: "1px solid var(--ts-border)" }}>
               <div className="px-4 pt-3 pb-1">
                 <span style={{ color: "var(--ts-muted)", fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                  Legs â€” drag to reorder
+                  Legs — drag to reorder
                 </span>
               </div>
 
@@ -1497,7 +1497,7 @@ export default function OptionsChain() {
                       {/* Card header */}
                       <div style={{ background: isBuy ? "var(--ts-buy-bg)" : "var(--ts-sell-bg)" }}
                         className="flex items-center gap-2 px-3 py-2.5">
-                        <span style={{ color: "var(--ts-muted)", fontSize: "18px", lineHeight: 1, userSelect: "none", flexShrink: 0 }}>â ¿</span>
+                        <span style={{ color: "var(--ts-muted)", fontSize: "18px", lineHeight: 1, userSelect: "none", flexShrink: 0 }}>⠿</span>
                         <button onClick={() => handleToggleAction(leg.id)}
                           style={{
                             background: isBuy ? "rgba(16,185,129,0.18)" : "rgba(239,68,68,0.18)",
@@ -1547,10 +1547,10 @@ export default function OptionsChain() {
                           style={{ accentColor: "var(--ts-accent)", width: "14px", height: "14px", cursor: "pointer", flexShrink: 0 }} />
                         <button onClick={() => handleRemoveLeg(leg.id)}
                           style={{ color: "var(--ts-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "15px", lineHeight: 1, padding: "2px 0", flexShrink: 0 }}
-                          className="hover:text-red-400 transition-colors">âœ•</button>
+                          className="hover:text-red-400 transition-colors">✕</button>
                       </div>
 
-                      {/* Card body: Lots | Entry â‚¹ | LTP / P&L */}
+                      {/* Card body: Lots | Entry ₹ | LTP / P&L */}
                       <div className="grid grid-cols-3" style={{ borderTop: "1px solid var(--ts-border)" }}>
                         <div className="px-3 py-2" style={{ borderRight: "1px solid var(--ts-border)" }}>
                           <div style={{ color: "var(--ts-muted)", fontSize: "10px", marginBottom: "3px" }}>Lots</div>
@@ -1560,7 +1560,7 @@ export default function OptionsChain() {
                               width: "48px", textAlign: "center", fontWeight: 700, fontSize: "14px" }} />
                         </div>
                         <div className="px-3 py-2" style={{ borderRight: "1px solid var(--ts-border)" }}>
-                          <div style={{ color: "var(--ts-muted)", fontSize: "10px", marginBottom: "3px" }}>Entry â‚¹</div>
+                          <div style={{ color: "var(--ts-muted)", fontSize: "10px", marginBottom: "3px" }}>Entry ₹</div>
                           <input type="number" step="0.05" value={leg.entry_price}
                             onChange={e => handleUpdateLeg(leg.id, { entry_price: Number(e.target.value) })}
                             style={{ background: "transparent", color: "var(--ts-text)", border: "none", outline: "none",
@@ -1570,11 +1570,11 @@ export default function OptionsChain() {
                           <div style={{ color: "var(--ts-muted)", fontSize: "10px", marginBottom: "3px" }}>LTP / P&L</div>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span style={{ color: "var(--ts-text)", fontFamily: "monospace", fontWeight: 700, fontSize: "13px" }}>
-                              {currentLtp !== null ? currentLtp.toFixed(2) : "â€”"}
+                              {currentLtp !== null ? currentLtp.toFixed(2) : "—"}
                             </span>
                             {pnl !== null && (
                               <span style={{ color: pnl >= 0 ? "var(--ts-profit)" : "var(--ts-loss)", fontSize: "11px", fontWeight: 700 }}>
-                                {pnl >= 0 ? "+" : ""}â‚¹{Math.round(pnl).toLocaleString("en-IN")}
+                                {pnl >= 0 ? "+" : ""}₹{Math.round(pnl).toLocaleString("en-IN")}
                               </span>
                             )}
                           </div>
@@ -1587,13 +1587,13 @@ export default function OptionsChain() {
                         <button onClick={() => toggleLegExpand(leg.id)}
                           style={{ color: "var(--ts-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "11px" }}
                           className="hover:text-white transition-colors">
-                          {isExpanded ? "â–² Hide SL/TP" : "â–¼ SL / TP / Schedule"}
+                          {isExpanded ? "▲ Hide SL/TP" : "▼ SL / TP / Schedule"}
                         </button>
                         <div className="flex items-center gap-2">
                           {legSlHit && <span style={{ color: "var(--ts-loss)", background: "rgba(239,68,68,0.12)", borderRadius: "4px", fontSize: "10px", padding: "2px 6px", fontWeight: 700 }} className="animate-pulse">SL HIT</span>}
                           {legTpHit && <span style={{ color: "var(--ts-profit)", background: "rgba(16,185,129,0.12)", borderRadius: "4px", fontSize: "10px", padding: "2px 6px", fontWeight: 700 }} className="animate-pulse">TP HIT</span>}
-                          {!entryPassed && !legSlHit && !legTpHit && <span style={{ color: "var(--ts-warning)", fontSize: "11px", fontWeight: 700 }}>â³</span>}
-                          {exitPassed && !legSlHit && !legTpHit && <span style={{ color: "var(--ts-muted)", fontSize: "11px", fontWeight: 700 }}>â¹</span>}
+                          {!entryPassed && !legSlHit && !legTpHit && <span style={{ color: "var(--ts-warning)", fontSize: "11px", fontWeight: 700 }}>⏳</span>}
+                          {exitPassed && !legSlHit && !legTpHit && <span style={{ color: "var(--ts-muted)", fontSize: "11px", fontWeight: 700 }}>⏹</span>}
                         </div>
                       </div>
 
@@ -1612,7 +1612,7 @@ export default function OptionsChain() {
                                 <div className="flex items-center gap-2">
                                   <span style={{ color: "var(--ts-text-secondary)", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Entry</span>
                                   <span style={{ color: entryPassed ? "var(--ts-profit)" : "var(--ts-warning)", background: entryPassed ? "rgba(16,185,129,0.10)" : "rgba(245,158,11,0.10)", borderRadius: "4px", fontSize: "9px", padding: "1px 5px", fontWeight: 700 }}>
-                                    {entryPassed ? "âœ“ IN" : "â³ WAIT"}
+                                    {entryPassed ? "✓ IN" : "⏳ WAIT"}
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
@@ -1623,7 +1623,7 @@ export default function OptionsChain() {
                               <div className="space-y-1">
                                 <div className="flex items-center gap-2">
                                   <span style={{ color: "var(--ts-text-secondary)", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Exit</span>
-                                  {exitPassed && <span style={{ color: "var(--ts-loss)", background: "rgba(239,68,68,0.10)", borderRadius: "4px", fontSize: "9px", padding: "1px 5px", fontWeight: 700 }}>â¹ OUT</span>}
+                                  {exitPassed && <span style={{ color: "var(--ts-loss)", background: "rgba(239,68,68,0.10)", borderRadius: "4px", fontSize: "9px", padding: "1px 5px", fontWeight: 700 }}>⏹ OUT</span>}
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                   <input type="time" value={leg.exit_time ?? "15:25"} onChange={e => handleUpdateLeg(leg.id, { exit_time: e.target.value })} style={{ ...inp2, width: "108px" }} />
@@ -1646,7 +1646,7 @@ export default function OptionsChain() {
                                 </div>
                                 {(leg.sl_enabled ?? false) && (
                                   <div style={{ color: legSlHit ? "var(--ts-loss)" : "var(--ts-warning)", fontFamily: "monospace", fontSize: "12px", fontWeight: 700, marginTop: "5px" }} className={legSlHit ? "animate-pulse" : ""}>
-                                    â‚¹{slPriceLeg.toFixed(2)}{legSlHit ? " âš " : ""}
+                                    ₹{slPriceLeg.toFixed(2)}{legSlHit ? " ⚠" : ""}
                                   </div>
                                 )}
                               </div>
@@ -1664,7 +1664,7 @@ export default function OptionsChain() {
                                 </div>
                                 {(leg.tp_enabled ?? false) && (
                                   <div style={{ color: legTpHit ? "var(--ts-profit)" : "#a3e635", fontFamily: "monospace", fontSize: "12px", fontWeight: 700, marginTop: "5px" }} className={legTpHit ? "animate-pulse" : ""}>
-                                    â‚¹{tpPriceLeg.toFixed(2)}{legTpHit ? " âœ“" : ""}
+                                    ₹{tpPriceLeg.toFixed(2)}{legTpHit ? " ✓" : ""}
                                   </div>
                                 )}
                               </div>
@@ -1686,24 +1686,24 @@ export default function OptionsChain() {
                     className="px-4 py-2.5 flex items-center justify-between">
                     <span style={{ color: "var(--ts-muted)", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>Paper P&L</span>
                     <span style={{ color: totalPnl >= 0 ? "var(--ts-profit)" : "var(--ts-loss)", fontFamily: "monospace", fontSize: "17px", fontWeight: 900 }}>
-                      {totalPnl >= 0 ? "+" : ""}â‚¹{Math.round(totalPnl).toLocaleString("en-IN")}
+                      {totalPnl >= 0 ? "+" : ""}₹{Math.round(totalPnl).toLocaleString("en-IN")}
                     </span>
                   </div>
                 );
               })()}
             </div>
 
-            {/* â”€â”€ RIGHT: Analysis (3/5) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {/* ── RIGHT: Analysis (3/5) ────────────────────────────────────────── */}
             <div className="xl:col-span-3 flex flex-col">
 
               {/* Stats bar */}
               {payoff ? (
                 <div className="grid grid-cols-2 md:grid-cols-4" style={{ borderBottom: "1px solid var(--ts-border)" }}>
                   {[
-                    { label: "Max Profit",  value: maxProfit === null ? "âˆž Unlimited" : `â‚¹${maxProfit.toLocaleString("en-IN")}`,                    color: "var(--ts-profit)",          pulse: false, sub: "" },
-                    { label: "Max Loss",    value: maxLoss   === null ? "âˆž Unlimited" : `â‚¹${Math.abs(maxLoss).toLocaleString("en-IN")}`,             color: "var(--ts-loss)",            pulse: maxLoss === null, sub: "" },
-                    { label: "Net Premium", value: `${payoff.net_premium >= 0 ? "+" : ""}â‚¹${Math.abs(payoff.net_premium).toLocaleString("en-IN")}`, color: payoff.net_premium >= 0 ? "var(--ts-profit)" : "var(--ts-text-secondary)", pulse: false, sub: payoff.net_premium >= 0 ? "CREDIT" : "DEBIT" },
-                    { label: "Theta / Day", value: `${payoff.net_greeks.theta >= 0 ? "+" : ""}â‚¹${Math.round(payoff.net_greeks.theta).toLocaleString("en-IN")}`, color: payoff.net_greeks.theta >= 0 ? "var(--ts-profit)" : "var(--ts-text-secondary)", pulse: false, sub: "" },
+                    { label: "Max Profit",  value: maxProfit === null ? "∞ Unlimited" : `₹${maxProfit.toLocaleString("en-IN")}`,                    color: "var(--ts-profit)",          pulse: false, sub: "" },
+                    { label: "Max Loss",    value: maxLoss   === null ? "∞ Unlimited" : `₹${Math.abs(maxLoss).toLocaleString("en-IN")}`,             color: "var(--ts-loss)",            pulse: maxLoss === null, sub: "" },
+                    { label: "Net Premium", value: `${payoff.net_premium >= 0 ? "+" : ""}₹${Math.abs(payoff.net_premium).toLocaleString("en-IN")}`, color: payoff.net_premium >= 0 ? "var(--ts-profit)" : "var(--ts-text-secondary)", pulse: false, sub: payoff.net_premium >= 0 ? "CREDIT" : "DEBIT" },
+                    { label: "Theta / Day", value: `${payoff.net_greeks.theta >= 0 ? "+" : ""}₹${Math.round(payoff.net_greeks.theta).toLocaleString("en-IN")}`, color: payoff.net_greeks.theta >= 0 ? "var(--ts-profit)" : "var(--ts-text-secondary)", pulse: false, sub: "" },
                   ].map((cell, ci) => (
                     <div key={cell.label} className="px-4 py-3"
                       style={{ borderRight: ci < 3 ? "1px solid var(--ts-border)" : "none" }}>
@@ -1716,7 +1716,7 @@ export default function OptionsChain() {
                 </div>
               ) : (
                 <div style={{ borderBottom: "1px solid var(--ts-border)", color: "var(--ts-muted)", fontSize: "13px" }}
-                  className="px-4 py-3">Loading analysisâ€¦</div>
+                  className="px-4 py-3">Loading analysis…</div>
               )}
 
               {/* Breakevens */}
@@ -1744,7 +1744,7 @@ export default function OptionsChain() {
               <div className="p-3" style={{ minHeight: "280px" }}>
                 {payoffLoading && !payoff && (
                   <div className="h-full flex items-center justify-center animate-pulse" style={{ color: "var(--ts-muted)", minHeight: "200px" }}>
-                    Calculating curvesâ€¦
+                    Calculating curves…
                   </div>
                 )}
                 {payoff && (
@@ -1759,10 +1759,10 @@ export default function OptionsChain() {
                         <Tooltip
                           contentStyle={{ backgroundColor: "#030712", borderColor: "#1f2937", fontSize: 12, borderRadius: "8px" }}
                           labelStyle={{ color: "#9ca3af", fontWeight: "bold" }}
-                          labelFormatter={(v: number) => `Spot: â‚¹${v.toLocaleString("en-IN")}`}
+                          labelFormatter={(v: number) => `Spot: ₹${v.toLocaleString("en-IN")}`}
                           formatter={(val: number, name: string) => {
                             if (name === "profit_fill" || name === "loss_fill") return [null, null];
-                            return [`${val >= 0 ? "+" : ""}â‚¹${Math.round(val).toLocaleString("en-IN")}`, name];
+                            return [`${val >= 0 ? "+" : ""}₹${Math.round(val).toLocaleString("en-IN")}`, name];
                           }}
                         />
                         <Legend verticalAlign="top" height={22} iconType="circle" wrapperStyle={{ fontSize: "11px" }}
@@ -1785,7 +1785,7 @@ export default function OptionsChain() {
                         ))}
                         {sigma1 && spotPrice && (<>
                           <ReferenceLine x={Math.round(spotPrice - sigma1 * 2)} stroke="#a78bfa" strokeDasharray="2 5" strokeWidth={1}
-                            label={{ value: "âˆ’2SD", fill: "#a78bfa", fontSize: 8, position: "insideTopLeft" }} />
+                            label={{ value: "−2SD", fill: "#a78bfa", fontSize: 8, position: "insideTopLeft" }} />
                           <ReferenceLine x={Math.round(spotPrice + sigma1 * 2)} stroke="#a78bfa" strokeDasharray="2 5" strokeWidth={1}
                             label={{ value: "+2SD", fill: "#a78bfa", fontSize: 8, position: "insideTopRight" }} />
                         </>)}
@@ -1806,7 +1806,7 @@ export default function OptionsChain() {
                           const col = pp >= 0 ? "#10b981" : "#ef4444";
                           return (
                             <ReferenceDot x={spotPrice} y={pp} r={5} fill={col} stroke="#111827" strokeWidth={2}
-                              label={{ value: `${pp >= 0 ? "+" : ""}â‚¹${pp.toLocaleString("en-IN")}`, position: "top", fill: col, fontSize: 10, fontWeight: "bold" }} />
+                              label={{ value: `${pp >= 0 ? "+" : ""}₹${pp.toLocaleString("en-IN")}`, position: "top", fill: col, fontSize: 10, fontWeight: "bold" }} />
                           );
                         })()}
                         <Line type="linear" dataKey="expiry_pnl" name="On Expiry"      stroke="#22c55e" strokeWidth={2.5} dot={false} isAnimationActive={false} connectNulls />
@@ -1815,9 +1815,9 @@ export default function OptionsChain() {
                     </ResponsiveContainer>
                     {sigma1 && (
                       <div className="flex gap-4 mt-1 px-1 flex-wrap">
-                        <span style={{ color: "#818cf8", fontSize: "11px" }}>1SD Â±{Math.round(sigma1).toLocaleString("en-IN")}</span>
-                        <span style={{ color: "#a78bfa", fontSize: "11px" }}>2SD Â±{Math.round(sigma1 * 2).toLocaleString("en-IN")}</span>
-                        {atmIv && <span style={{ color: "var(--ts-muted)", fontSize: "11px" }}>IV {atmIv.toFixed(1)}% Â· {Math.round(daysToExpiry)}DTE</span>}
+                        <span style={{ color: "#818cf8", fontSize: "11px" }}>1SD ±{Math.round(sigma1).toLocaleString("en-IN")}</span>
+                        <span style={{ color: "#a78bfa", fontSize: "11px" }}>2SD ±{Math.round(sigma1 * 2).toLocaleString("en-IN")}</span>
+                        {atmIv && <span style={{ color: "var(--ts-muted)", fontSize: "11px" }}>IV {atmIv.toFixed(1)}% · {Math.round(daysToExpiry)}DTE</span>}
                       </div>
                     )}
                   </>
@@ -1833,11 +1833,11 @@ export default function OptionsChain() {
                     <div className="flex items-center gap-3 flex-wrap">
                       {atmIv && (
                         <span style={{ color: "var(--ts-muted)", fontFamily: "monospace", fontSize: "11px" }}>
-                          {atmIv.toFixed(1)}% â†’ <span style={{ color: ivShift !== 0 ? "#818cf8" : "var(--ts-muted)" }}>{(atmIv + ivShift).toFixed(1)}%</span>
+                          {atmIv.toFixed(1)}% → <span style={{ color: ivShift !== 0 ? "#818cf8" : "var(--ts-muted)" }}>{(atmIv + ivShift).toFixed(1)}%</span>
                         </span>
                       )}
                       <span style={{ color: ivShift === 0 ? "var(--ts-muted)" : ivImpact >= 0 ? "var(--ts-profit)" : "var(--ts-loss)", fontFamily: "monospace", fontSize: "11px", fontWeight: 700 }}>
-                        {ivShift === 0 ? "neutral" : `${ivShift > 0 ? "+" : ""}${ivShift}% â†’ ${ivImpact >= 0 ? "+" : ""}â‚¹${Math.abs(ivImpact).toLocaleString("en-IN")}`}
+                        {ivShift === 0 ? "neutral" : `${ivShift > 0 ? "+" : ""}${ivShift}% → ${ivImpact >= 0 ? "+" : ""}₹${Math.abs(ivImpact).toLocaleString("en-IN")}`}
                       </span>
                       {ivShift !== 0 && (
                         <button onClick={() => setIvShift(0)}
@@ -1847,7 +1847,7 @@ export default function OptionsChain() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span style={{ color: "var(--ts-loss)", fontFamily: "monospace", fontSize: "11px", width: "32px", textAlign: "right" }}>âˆ’50%</span>
+                    <span style={{ color: "var(--ts-loss)", fontFamily: "monospace", fontSize: "11px", width: "32px", textAlign: "right" }}>−50%</span>
                     <input type="range" min={-50} max={50} step={1} value={ivShift} onChange={e => setIvShift(Number(e.target.value))}
                       className="flex-1 h-1.5 rounded cursor-pointer" style={{ accentColor: "#6366f1" }} />
                     <span style={{ color: "var(--ts-profit)", fontFamily: "monospace", fontSize: "11px", width: "32px" }}>+50%</span>
@@ -1880,8 +1880,8 @@ export default function OptionsChain() {
                       {[
                         { label: "Delta",    val: payoff.net_greeks.delta.toFixed(3), color: payoff.net_greeks.delta >= 0 ? "var(--ts-profit)" : "var(--ts-loss)" },
                         { label: "Gamma",    val: payoff.net_greeks.gamma.toFixed(5), color: "var(--ts-text)" },
-                        { label: "Theta",    val: `â‚¹${Math.round(payoff.net_greeks.theta)}`,  color: payoff.net_greeks.theta >= 0 ? "var(--ts-profit)" : "var(--ts-loss)" },
-                        { label: "Vega/1%", val: `â‚¹${Math.round(payoff.net_greeks.vega)}`,   color: payoff.net_greeks.vega  >= 0 ? "var(--ts-profit)" : "var(--ts-loss)" },
+                        { label: "Theta",    val: `₹${Math.round(payoff.net_greeks.theta)}`,  color: payoff.net_greeks.theta >= 0 ? "var(--ts-profit)" : "var(--ts-loss)" },
+                        { label: "Vega/1%", val: `₹${Math.round(payoff.net_greeks.vega)}`,   color: payoff.net_greeks.vega  >= 0 ? "var(--ts-profit)" : "var(--ts-loss)" },
                       ].map(g => (
                         <div key={g.label} style={{ background: "var(--ts-bg-elevated)", borderRadius: "8px" }} className="px-2 py-2">
                           <div style={{ color: "var(--ts-muted)", fontSize: "10px" }}>{g.label}</div>
@@ -1896,7 +1896,7 @@ export default function OptionsChain() {
                       <span style={{ color: "var(--ts-muted)", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>Paper Trade</span>
                       {(slHit || tpHit) && (
                         <span style={{ color: tpHit ? "var(--ts-profit)" : "var(--ts-loss)", background: tpHit ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)", borderRadius: "4px", fontSize: "10px", padding: "2px 7px", fontWeight: 800 }} className="animate-pulse">
-                          {tpHit ? "TP âœ“" : "SL âœ—"}
+                          {tpHit ? "TP ✓" : "SL ✗"}
                         </span>
                       )}
                     </div>
@@ -1911,7 +1911,7 @@ export default function OptionsChain() {
                             <input type="number" min={1} max={200} value={slPct} onChange={e => setSlPct(Math.max(1, Number(e.target.value)))} disabled={!slEnabled}
                               style={{ background: "var(--ts-bg-elevated)", color: "var(--ts-text)", border: "1px solid var(--ts-border)", borderRadius: "6px", width: "46px", textAlign: "right", fontFamily: "monospace", fontSize: "12px", padding: "2px 6px", outline: "none", opacity: slEnabled ? 1 : 0.4 }} />
                             <span style={{ color: "var(--ts-muted)", fontSize: "11px" }}>%</span>
-                            {slEnabled && slLevel !== null && <span style={{ color: slHit ? "var(--ts-warning)" : "var(--ts-text-secondary)", fontFamily: "monospace", fontSize: "11px", fontWeight: 700 }}>â‚¹{Math.abs(slLevel).toLocaleString("en-IN")}</span>}
+                            {slEnabled && slLevel !== null && <span style={{ color: slHit ? "var(--ts-warning)" : "var(--ts-text-secondary)", fontFamily: "monospace", fontSize: "11px", fontWeight: 700 }}>₹{Math.abs(slLevel).toLocaleString("en-IN")}</span>}
                           </div>
                         </div>
                       </div>
@@ -1925,7 +1925,7 @@ export default function OptionsChain() {
                             <input type="number" min={1} max={500} value={tpPct} onChange={e => setTpPct(Math.max(1, Number(e.target.value)))} disabled={!tpEnabled}
                               style={{ background: "var(--ts-bg-elevated)", color: "var(--ts-text)", border: "1px solid var(--ts-border)", borderRadius: "6px", width: "46px", textAlign: "right", fontFamily: "monospace", fontSize: "12px", padding: "2px 6px", outline: "none", opacity: tpEnabled ? 1 : 0.4 }} />
                             <span style={{ color: "var(--ts-muted)", fontSize: "11px" }}>%</span>
-                            {tpEnabled && tpLevel !== null && <span style={{ color: tpHit ? "var(--ts-profit)" : "var(--ts-text-secondary)", fontFamily: "monospace", fontSize: "11px", fontWeight: 700 }}>â‚¹{Math.abs(tpLevel).toLocaleString("en-IN")}</span>}
+                            {tpEnabled && tpLevel !== null && <span style={{ color: tpHit ? "var(--ts-profit)" : "var(--ts-text-secondary)", fontFamily: "monospace", fontSize: "11px", fontWeight: 700 }}>₹{Math.abs(tpLevel).toLocaleString("en-IN")}</span>}
                           </div>
                         </div>
                       </div>
@@ -1934,7 +1934,7 @@ export default function OptionsChain() {
                       <div style={{ borderTop: "1px solid var(--ts-border)", marginTop: "8px", paddingTop: "6px" }} className="flex items-center gap-2">
                         <span style={{ color: "var(--ts-muted)", fontFamily: "monospace", fontSize: "11px" }}>P&L:</span>
                         <span style={{ color: spotPnl >= 0 ? "var(--ts-profit)" : "var(--ts-loss)", fontFamily: "monospace", fontSize: "13px", fontWeight: 800 }}>
-                          {spotPnl >= 0 ? "+" : ""}â‚¹{Math.round(spotPnl).toLocaleString("en-IN")}
+                          {spotPnl >= 0 ? "+" : ""}₹{Math.round(spotPnl).toLocaleString("en-IN")}
                         </span>
                       </div>
                     )}
