@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  getFlowDates, getDots, getOiExpiries, getOiStrikes, getOiAnalysis, getOiTools, getFlowLive, getFiiDii,
+  getFlowDates, getDots, getOiExpiries, getOiStrikes, getOiAnalysis, getOiTools,
+  getOiToolsLive, getLiveExpiries, getLiveStrikes, getOiAnalysisLive,
+  getFlowLive, getFiiDii,
 } from "../api";
 import type { FiiDiiDay } from "../api";
 import LWChart from "./LWChart";
@@ -123,49 +125,77 @@ export default function FlowMatrix() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [underlying, mode]);
 
-  // For live mode non-dots tabs: use latest available DB date (today has no historical options data)
-  const effDate = (mode === "live" && sub !== "dots" && dates.length > 0) ? dates[0] : date;
 
+  // Load expiries: live mode → scrip master; historical → DB
   useEffect(() => {
     if (!needsExpiry(sub)) return;
-    const qDate = (mode === "live" && dates.length > 0) ? dates[0] : date;
-    if (!qDate) return;
-    getOiExpiries(underlying, qDate).then((e) => { setExpiries(e); setExpiry((p) => (e.includes(p) ? p : e[0] ?? "")); }).catch(() => setExpiries([]));
+    if (mode === "live") {
+      getLiveExpiries(underlying)
+        .then((e) => { setExpiries(e); setExpiry((p) => (e.includes(p) ? p : e[0] ?? "")); })
+        .catch(() => setExpiries([]));
+    } else {
+      if (!date) return;
+      getOiExpiries(underlying, date).then((e) => { setExpiries(e); setExpiry((p) => (e.includes(p) ? p : e[0] ?? "")); }).catch(() => setExpiries([]));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sub, underlying, date, mode, dates]);
+  }, [sub, underlying, date, mode]);
 
+  // Load strikes: live mode → from feed (ATM-centred window); historical → DB
   useEffect(() => {
     if (sub !== "oi" || !expiry) return;
-    const qDate = (mode === "live" && dates.length > 0) ? dates[0] : date;
-    if (!qDate) return;
-    getOiStrikes(underlying, qDate, expiry).then((s) => { setStrikes(s); setStrike((p) => (typeof p === "number" && s.includes(p) ? p : s[Math.floor(s.length / 2)] ?? "")); }).catch(() => setStrikes([]));
+    if (mode === "live") {
+      getLiveStrikes(underlying, expiry)
+        .then(({ strikes: s, spot }) => {
+          setStrikes(s);
+          // auto-select ATM strike closest to spot
+          const atm = spot > 0 ? s.reduce((best, sk) => Math.abs(sk - spot) < Math.abs(best - spot) ? sk : best, s[0] ?? 0) : s[Math.floor(s.length / 2)] ?? 0;
+          setStrike((p) => (typeof p === "number" && s.includes(p) ? p : atm || s[0] || ""));
+        })
+        .catch(() => setStrikes([]));
+    } else {
+      if (!date) return;
+      getOiStrikes(underlying, date, expiry).then((s) => { setStrikes(s); setStrike((p) => (typeof p === "number" && s.includes(p) ? p : s[Math.floor(s.length / 2)] ?? "")); }).catch(() => setStrikes([]));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sub, underlying, date, mode, dates, expiry]);
+  }, [sub, underlying, date, mode, expiry]);
 
   const go = useCallback(() => {
     if (sub === "risk" || sub === "fii") return;
-    const qDate = mode === "live" && sub !== "dots" && dates.length > 0 ? dates[0] : date;
-    if (!qDate) return;
     setLoading(true); setErr(null);
     const done = () => setLoading(false);
     const fail = (e: Error) => { setErr(e.message); setLoading(false); };
-    if (sub === "dots") getDots(underlying, qDate, interval, mode).then((d) => { setDots(d); done(); }).catch(fail);
-    else if (sub === "oi") {
-      if (!expiry || strike === "") { done(); return; }
-      getOiAnalysis(underlying, qDate, expiry, Number(strike), interval, mode).then((d) => { setOi(d); done(); }).catch(fail);
+
+    if (sub === "dots") {
+      const qDate = mode === "live" ? (dates.length ? dates[0] : date) : date;
+      getDots(underlying, qDate, interval, mode).then((d) => { setDots(d); done(); }).catch(fail);
+    } else if (mode === "live") {
+      // live mode: always use feed endpoints
+      if ((TOOL_SUBS as readonly string[]).includes(sub)) {
+        if (!expiry) { done(); return; }
+        getOiToolsLive(underlying, expiry).then((d) => { setTools(d); done(); }).catch(fail);
+      } else if (sub === "oi") {
+        if (!expiry || strike === "") { done(); return; }
+        getOiAnalysisLive(underlying, expiry, Number(strike)).then((d) => { setOi(d); done(); }).catch(fail);
+      } else { done(); }
     } else {
-      if (!expiry) { done(); return; }
-      getOiTools(underlying, qDate, expiry, interval).then((d) => { setTools(d); done(); }).catch(fail);
+      // historical mode: DB endpoints
+      if (!date) { done(); return; }
+      if (sub === "oi") {
+        if (!expiry || strike === "") { done(); return; }
+        getOiAnalysis(underlying, date, expiry, Number(strike), interval, mode).then((d) => { setOi(d); done(); }).catch(fail);
+      } else {
+        if (!expiry) { done(); return; }
+        getOiTools(underlying, date, expiry, interval).then((d) => { setTools(d); done(); }).catch(fail);
+      }
     }
   }, [sub, underlying, date, dates, interval, mode, expiry, strike]);
 
-  // In live mode, auto-run OI tool tabs when expiry (and strike for oi) are ready
+  // Auto-run + poll when in live mode and expiry (+ strike for oi) ready
   useEffect(() => {
     if (mode !== "live" || sub === "dots" || sub === "risk" || sub === "fii") return;
     if (!expiry) return;
     if (sub === "oi" && strike === "") return;
     go();
-    // Poll every 30s in live mode for OI tools
     if (toolPoll.current) clearInterval(toolPoll.current);
     toolPoll.current = setInterval(go, 30000);
     return () => { if (toolPoll.current) { clearInterval(toolPoll.current); toolPoll.current = null; } };
@@ -200,13 +230,10 @@ export default function FlowMatrix() {
             </div>
           </div>
           <Field label="Name"><select className={inp} value={underlying} onChange={(e) => setUnderlying(e.target.value)}><option>BANKNIFTY</option><option>NIFTY</option></select></Field>
-          {/* In live mode show today badge; historical shows date select */}
+          {/* In live mode show TODAY badge; historical shows date select */}
           {mode === "live" && sub !== "dots" && (
             <Field label="Date">
-              <div className="px-3 py-1.5 rounded-lg bg-blue-900/30 border border-blue-700/40 text-xs text-blue-300 font-mono font-bold flex items-center gap-2">
-                {effDate || "—"}
-                <span className="text-[9px] bg-blue-800/50 px-1.5 py-0.5 rounded text-blue-400">LATEST DB</span>
-              </div>
+              <div className="px-3 py-1.5 rounded-lg bg-emerald-900/30 border border-emerald-700/40 text-xs text-emerald-400 font-mono font-bold">{new Date().toISOString().slice(0, 10)} · TODAY</div>
             </Field>
           )}
           {mode === "historical" && (
