@@ -146,7 +146,11 @@ export default function OptionsChain() {
   // Selected filter states
   const [selectedExpiry, setSelectedExpiry] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<string>("");
-  const [sliderVal, setSliderVal] = useState<number>(560); // Default to 09:20 AM (560m)
+  // After market close default to 15:30 so EOD data loads immediately
+  const [sliderVal, setSliderVal] = useState<number>(() => {
+    const now = new Date();
+    return now.getHours() * 60 + now.getMinutes() >= 15 * 60 + 30 ? 930 : 560;
+  });
   
   // After 15:30 market is closed â€” no live needed
   const isMarketClosed = (): boolean => {
@@ -249,8 +253,24 @@ export default function OptionsChain() {
     return () => clearTimeout(t);
   }, [sliderVal, isLive]);
 
+  // Auto-switch live → historical when market closes at 15:30, jump slider to close
+  useEffect(() => {
+    const tick = setInterval(() => {
+      if (isLive && isMarketClosed()) {
+        setIsLive(false);
+        localStorage.setItem("oc_isLive", "false");
+        setSliderVal(930);
+      }
+    }, 30_000);
+    return () => clearInterval(tick);
+  }, [isLive]);
+
   // Change date â†’ auto-pick nearest valid expiry for that date from DB
   const handleDateChange = (newDate: string) => {
+    // When navigating to today after close, jump slider to 15:30 for EOD data
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+    if (newDate === todayStr && isMarketClosed()) setSliderVal(930);
     setSelectedDate(newDate);
     // Ask backend which expiries have data for this date
     getExpiriesForDate(underlying, newDate)
@@ -895,8 +915,8 @@ export default function OptionsChain() {
               onClick={() => {
                 // After 15:30 market is closed: switch to historical with latest data
                 if (!isLive && isMarketClosed()) {
-                  setIsLive(false);
-                  localStorage.setItem("oc_isLive", "false");
+                  // Already in historical; jump to close to load EOD data
+                  setSliderVal(930);
                   getOptionsChainLatestDate(underlying).then((d) => {
                     if (d) handleDateChange(d);
                   });
