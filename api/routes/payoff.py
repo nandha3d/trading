@@ -25,8 +25,8 @@ def _compute_payoff(req: PayoffRequest) -> PayoffResponse:
     if req.spot <= 0:
         raise ValueError("spot must be > 0")
 
-    req_exp_date = date.fromisoformat(req.expiry)
-    cur_date = date.fromisoformat(req.current_date)
+    req_exp_date = date.fromisoformat(req.expiry.split("T")[0].split(" ")[0])
+    cur_date = date.fromisoformat(req.current_date.split("T")[0].split(" ")[0])
 
     def resolve_lot(u: str) -> int:
         # client-supplied lot (from live chain / broker scrip) wins for the
@@ -41,7 +41,7 @@ def _compute_payoff(req: PayoffRequest) -> PayoffResponse:
     # Per-leg expiry: use leg.expiry if set, else fall back to req.expiry.
     # primary_exp = earliest leg expiry; used as the evaluation date for expiry_pnl.
     leg_exp_dates = [
-        date.fromisoformat(leg.expiry) if leg.expiry else req_exp_date
+        date.fromisoformat(leg.expiry.split("T")[0].split(" ")[0]) if leg.expiry else req_exp_date
         for leg in req.legs
     ]
     primary_exp = min(leg_exp_dates)
@@ -167,72 +167,6 @@ async def get_payoff(req: PayoffRequest):
         raise HTTPException(500, f"payoff error: {e}")
 
 
-def _save_strategy(req: SaveStrategyRequest):
-    storage.init_db()
-    con = storage.db().cursor()
-    try:
-        strategy_id = str(uuid.uuid4())
-        created_at = datetime.now()
-        legs_list = [leg.dict() for leg in req.legs]
-        legs_json = json.dumps(legs_list)
-        con.execute(
-            "INSERT INTO saved_strategies (id, name, underlying, expiry, created_at, legs) VALUES (?, ?, ?, ?, ?, ?)",
-            [strategy_id, req.name, req.underlying.upper(), date.fromisoformat(req.expiry), created_at, legs_json]
-        )
-        return {"id": strategy_id, "status": "success"}
-    finally:
-        con.close()
 
+# Legacy strategy CRUD endpoints removed — now handled by api/routes/strategies.py
 
-def _list_strategies():
-    storage.init_db()
-    con = storage.db().cursor()
-    try:
-        rows = con.execute("SELECT id, name, underlying, expiry, created_at, legs FROM saved_strategies ORDER BY created_at DESC").fetchall()
-        out = []
-        for r_id, name, underlying, expiry, created_at, legs_json in rows:
-            out.append({
-                "id": r_id,
-                "name": name,
-                "underlying": underlying,
-                "expiry": expiry.isoformat() if hasattr(expiry, "isoformat") else str(expiry),
-                "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else str(created_at),
-                "legs": json.loads(legs_json)
-            })
-        return out
-    finally:
-        con.close()
-
-
-def _delete_strategy(strategy_id: str):
-    storage.init_db()
-    con = storage.db().cursor()
-    try:
-        con.execute("DELETE FROM saved_strategies WHERE id = ?", [strategy_id])
-        return {"status": "success"}
-    finally:
-        con.close()
-
-
-@router.post("/strategies/save")
-async def save_strategy(req: SaveStrategyRequest):
-    try:
-        return await asyncio.to_thread(_save_strategy, req)
-    except Exception as e:
-        raise HTTPException(500, f"Failed to save strategy: {e}")
-
-
-@router.get("/strategies/list", response_model=list[SavedStrategyResponse])
-async def list_strategies():
-    try:
-        return await asyncio.to_thread(_list_strategies)
-    except Exception as e:
-        raise HTTPException(500, f"Failed to list strategies: {e}")
-
-
-@router.delete("/strategies/{strategy_id}")
-async def delete_strategy(strategy_id: str):
-    try:
-        return await asyncio.to_thread(_delete_strategy, strategy_id)
-    except Exception as e:
-        raise HTTPException(500, f"Failed to delete strategy: {e}")

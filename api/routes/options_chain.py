@@ -19,6 +19,11 @@ class OptionData(BaseModel):
     iv: Optional[float] = None
     delta: Optional[float] = None
     theta: Optional[float] = None
+    gamma: Optional[float] = None
+    vega: Optional[float] = None
+    bid: Optional[float] = None
+    ask: Optional[float] = None
+    spread: Optional[float] = None
     oi_change: Optional[int] = None
 
 
@@ -78,7 +83,7 @@ def _get_trade_dates(underlying: str, expiry: str):
     con = storage.db().cursor()
     try:
         und = underlying.upper()
-        exp_date = date.fromisoformat(expiry)
+        exp_date = date.fromisoformat(expiry.split("T")[0].split(" ")[0])
         rows = con.execute(
             "SELECT DISTINCT CAST(ts AS DATE) d FROM options_1m WHERE underlying = ? AND expiry = ? ORDER BY d DESC",
             [und, exp_date],
@@ -93,7 +98,7 @@ def _get_options_chain_data(underlying: str, expiry: str, ts: str):
     con = storage.db().cursor()
     try:
         und = underlying.upper()
-        exp_date = date.fromisoformat(expiry)
+        exp_date = date.fromisoformat(expiry.split("T")[0].split(" ")[0])
 
         ts_str = ts.replace("T", " ")
         try:
@@ -147,13 +152,30 @@ def _get_options_chain_data(underlying: str, expiry: str, ts: str):
         iv_val: Optional[float] = None
         delta_val: Optional[float] = None
         theta_val: Optional[float] = None
+        gamma_val: Optional[float] = None
+        vega_val: Optional[float] = None
+        bid_val: Optional[float] = None
+        ask_val: Optional[float] = None
+        spread_val: Optional[float] = None
         if spot_price and close and close > 0 and t_years > 0:
             iv_val = calculate_iv(close, spot_price, strike, t_years, RISK_FREE, opt_type)
             if iv_val and iv_val > 0:
                 g = calculate_greeks(spot_price, strike, t_years, RISK_FREE, iv_val, opt_type)
                 delta_val = g["delta"]
                 theta_val = g["theta"]
+                gamma_val = round(g.get("gamma", 0.0), 6)
+                vega_val = round(g.get("vega", 0.0), 4)
                 iv_val = round(iv_val * 100, 2)  # as percentage
+
+            # Estimate bid/ask from close price with moneyness-based spread
+            if spot_price > 0:
+                moneyness = abs(strike - spot_price) / spot_price
+                # Wider spread for deep OTM, tighter for ATM
+                spread_bps = 0.5 + moneyness * 8.0  # 0.5% base + 8% per unit moneyness
+                half_spread = max(0.05, close * spread_bps / 100.0)
+                bid_val = round(max(0.05, close - half_spread), 2)
+                ask_val = round(close + half_spread, 2)
+                spread_val = round(ask_val - bid_val, 2)
 
         oi_chg: Optional[int] = None
         if oi is not None:
@@ -164,6 +186,8 @@ def _get_options_chain_data(underlying: str, expiry: str, ts: str):
         opt_data = OptionData(
             close=close, volume=volume, oi=oi,
             iv=iv_val, delta=delta_val, theta=theta_val,
+            gamma=gamma_val, vega=vega_val,
+            bid=bid_val, ask=ask_val, spread=spread_val,
             oi_change=oi_chg,
         )
         if opt_type == "CE":

@@ -67,7 +67,7 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex bg-gray-900 rounded-xl p-0.5 border border-gray-800">
-            {["NIFTY", "BANKNIFTY"].map((s) => (
+            {["NIFTY", "BANKNIFTY", "FINNIFTY"].map((s) => (
               <button key={s} onClick={() => setSymbol(s)}
                 className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${symbol === s ? "bg-blue-600 text-white shadow-md shadow-blue-900/30" : "text-gray-400 hover:text-gray-200"}`}>{s}</button>
             ))}
@@ -91,7 +91,7 @@ export default function Dashboard() {
       {/* Index live cards */}
       {spotData ? (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
-          <Card label="Last Price (LTP)" v={spotData.ltp.toLocaleString()} color={spotData.change >= 0 ? "text-emerald-400" : "text-rose-400"} />
+          <Card label={`${symbol} LTP`} v={spotData.ltp.toLocaleString()} color={spotData.change >= 0 ? "text-emerald-400" : "text-rose-400"} />
           <Card label="Day Change" v={`${spotData.change >= 0 ? "+" : ""}${spotData.change} (${spotData.change_pct.toFixed(2)}%)`} color={spotData.change >= 0 ? "text-emerald-400" : "text-rose-400"} />
           <Card label="Day Open" v={spotData.open.toLocaleString()} />
           <Card label="Day High" v={spotData.high.toLocaleString()} color="text-emerald-400/80" />
@@ -104,6 +104,46 @@ export default function Dashboard() {
           ))}
         </div>
       )}
+
+      {/* India VIX & FINNIFTY metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+        {snapshot?.vix != null ? (
+          <>
+            <Card label="India VIX" v={snapshot.vix.toFixed(2)} color={
+              snapshot.vix > 20 ? "text-rose-400" : snapshot.vix > 14 ? "text-amber-400" : "text-emerald-400"
+            } />
+            <Card label="VIX Regime" v={
+              snapshot.vix > 25 ? "HIGH VOL" : snapshot.vix > 18 ? "ELEVATED" : snapshot.vix > 12 ? "NORMAL" : "LOW VOL"
+            } color={
+              snapshot.vix > 25 ? "text-rose-400" : snapshot.vix > 18 ? "text-amber-400" : "text-emerald-400"
+            } />
+          </>
+        ) : (
+          <>
+            <Card label="India VIX" v="—" color="text-gray-500" />
+            <Card label="VIX Regime" v="—" color="text-gray-500" />
+          </>
+        )}
+        {snapshot?.finnifty != null ? (
+          <>
+            <Card label="FINNIFTY LTP" v={snapshot.finnifty.ltp?.toLocaleString() ?? "—"} color={
+              (snapshot.finnifty.change ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
+            } />
+            <Card label="FINNIFTY Chg" v={
+              snapshot.finnifty.change != null
+                ? `${snapshot.finnifty.change >= 0 ? "+" : ""}${snapshot.finnifty.change.toFixed(1)} (${(snapshot.finnifty.change_pct ?? 0).toFixed(2)}%)`
+                : "—"
+            } color={
+              (snapshot.finnifty.change ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
+            } />
+          </>
+        ) : (
+          <>
+            <Card label="FINNIFTY LTP" v="—" color="text-gray-500" />
+            <Card label="FINNIFTY Chg" v="—" color="text-gray-500" />
+          </>
+        )}
+      </div>
 
       {/* Regime, Levels & Alerts Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

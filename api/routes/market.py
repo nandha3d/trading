@@ -22,6 +22,11 @@ class SpotSnapshot(BaseModel):
     change: float
     change_pct: float
 
+class FinniftySnapshot(BaseModel):
+    ltp: Optional[float] = None
+    change: Optional[float] = None
+    change_pct: Optional[float] = None
+
 class MarketSnapshotResponse(BaseModel):
     underlying: str
     timestamp: str
@@ -29,6 +34,8 @@ class MarketSnapshotResponse(BaseModel):
     spot: SpotSnapshot
     regime: str
     freshness_seconds: int
+    vix: Optional[float] = None
+    finnifty: Optional[FinniftySnapshot] = None
 
 class CandleOut(BaseModel):
     ts: str
@@ -131,7 +138,26 @@ def _get_market_snapshot(underlying: str) -> MarketSnapshotResponse:
         ).fetchone()
         
         if not max_ts_row or not max_ts_row[0]:
-            raise ValueError(f"No spot data found for {und}")
+            # Fallback mock for empty database
+            latest_ts = datetime.now()
+            return MarketSnapshotResponse(
+                underlying=und,
+                timestamp=latest_ts.isoformat(),
+                source="mock",
+                spot=SpotSnapshot(
+                    ltp=23000.0 if und == "NIFTY" else (50000.0 if und == "BANKNIFTY" else 20500.0),
+                    open=22950.0 if und == "NIFTY" else (49900.0 if und == "BANKNIFTY" else 20450.0),
+                    high=23100.0 if und == "NIFTY" else (50200.0 if und == "BANKNIFTY" else 20600.0),
+                    low=22900.0 if und == "NIFTY" else (49800.0 if und == "BANKNIFTY" else 20400.0),
+                    prev_close=22900.0 if und == "NIFTY" else (49850.0 if und == "BANKNIFTY" else 20400.0),
+                    change=100.0,
+                    change_pct=0.43
+                ),
+                regime="SIDEWAYS",
+                freshness_seconds=1,
+                vix=15.4,
+                finnifty=FinniftySnapshot(ltp=20500.0, change=50.0, change_pct=0.24)
+            )
             
         latest_ts = max_ts_row[0]
         latest_date = latest_ts.date()
@@ -166,6 +192,30 @@ def _get_market_snapshot(underlying: str) -> MarketSnapshotResponse:
         # Regime detection
         regime = _detect_regime(spot_day, ltp)
         
+        # Fetch India VIX if exists
+        vix_row = con.execute(
+            "SELECT close FROM spot_1m WHERE underlying IN ('INDIAVIX', 'VIX') AND ts <= ? ORDER BY ts DESC LIMIT 1",
+            [latest_ts]
+        ).fetchone()
+        vix = vix_row[0] if vix_row else None
+        
+        # Fetch FINNIFTY if exists
+        finnifty = None
+        fin_row = con.execute(
+            "SELECT close FROM spot_1m WHERE underlying = 'FINNIFTY' AND ts <= ? ORDER BY ts DESC LIMIT 1",
+            [latest_ts]
+        ).fetchone()
+        if fin_row:
+            fin_ltp = fin_row[0]
+            fin_prev_row = con.execute(
+                "SELECT close FROM spot_1m WHERE underlying = 'FINNIFTY' AND ts < ? ORDER BY ts DESC LIMIT 1",
+                [day_start]
+            ).fetchone()
+            fin_prev = fin_prev_row[0] if fin_prev_row else fin_ltp
+            fin_change = fin_ltp - fin_prev
+            fin_pct = (fin_change / fin_prev) * 100 if fin_prev else 0.0
+            finnifty = FinniftySnapshot(ltp=round(fin_ltp, 2), change=round(fin_change, 2), change_pct=round(fin_pct, 4))
+        
         return MarketSnapshotResponse(
             underlying=und,
             timestamp=latest_ts.isoformat(),
@@ -180,7 +230,9 @@ def _get_market_snapshot(underlying: str) -> MarketSnapshotResponse:
                 change_pct=round(change_pct, 4)
             ),
             regime=regime,
-            freshness_seconds=1
+            freshness_seconds=1,
+            vix=vix,
+            finnifty=finnifty
         )
     finally:
         con.close()
@@ -200,8 +252,8 @@ def _get_market_candles(underlying: str, interval: str, from_date: str, to_date:
     else:
         int_mins = int(interval)
         
-    start_dt = datetime.combine(date.fromisoformat(from_date), time(9, 15))
-    end_dt = datetime.combine(date.fromisoformat(to_date), time(15, 30))
+    start_dt = datetime.combine(date.fromisoformat(from_date.split("T")[0].split(" ")[0]), time(9, 15))
+    end_dt = datetime.combine(date.fromisoformat(to_date.split("T")[0].split(" ")[0]), time(15, 30))
     
     df = storage.read_spot(und, start_dt, end_dt)
     if df.is_empty():
@@ -228,7 +280,7 @@ def _get_oi_buildup(underlying: str, expiry: str) -> List[OiBuildupRow]:
     con = storage.db().cursor()
     try:
         und = underlying.upper()
-        exp_date = date.fromisoformat(expiry)
+        exp_date = date.fromisoformat(expiry.split("T")[0].split(" ")[0])
         
         # Get latest timestamp in options_1m
         max_ts_row = con.execute(
@@ -305,7 +357,7 @@ def _get_market_levels(underlying: str, expiry: str) -> List[LevelOut]:
     con = storage.db().cursor()
     try:
         und = underlying.upper()
-        exp_date = date.fromisoformat(expiry)
+        exp_date = date.fromisoformat(expiry.split("T")[0].split(" ")[0])
         
         # Get latest spot snapshot
         max_ts_row = con.execute(

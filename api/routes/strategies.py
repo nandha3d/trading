@@ -27,12 +27,14 @@ class StrategySaveRequest(BaseModel):
     underlying: str
     expiry: str
     legs: List[StrategyLeg]
+    config: Optional[Dict[str, Any]] = None
 
 class StrategyUpdateRequest(BaseModel):
     name: str
     underlying: str
     expiry: str
     legs: List[StrategyLeg]
+    config: Optional[Dict[str, Any]] = None
 
 class TemplateLeg(BaseModel):
     action: str
@@ -147,9 +149,10 @@ def _save_strategy(req: StrategySaveRequest) -> Dict[str, Any]:
         created_at = datetime.now()
         legs_list = [leg.dict() for leg in req.legs]
         legs_json = json.dumps(legs_list)
+        config_json = json.dumps(req.config) if req.config else None
         con.execute(
-            "INSERT INTO saved_strategies (id, name, underlying, expiry, created_at, legs) VALUES (?, ?, ?, ?, ?, ?)",
-            [strategy_id, req.name, req.underlying.upper(), date.fromisoformat(req.expiry), created_at, legs_json]
+            "INSERT INTO saved_strategies (id, name, underlying, expiry, created_at, legs, config) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [strategy_id, req.name, req.underlying.upper(), date.fromisoformat(req.expiry), created_at, legs_json, config_json]
         )
         storage.log_audit_event("STRATEGY_CREATE", "STRATEGY", strategy_id, {"name": req.name})
         return {"id": strategy_id, "status": "success"}
@@ -162,9 +165,10 @@ def _update_strategy(strategy_id: str, req: StrategyUpdateRequest) -> Dict[str, 
     try:
         legs_list = [leg.dict() for leg in req.legs]
         legs_json = json.dumps(legs_list)
+        config_json = json.dumps(req.config) if req.config else None
         con.execute(
-            "UPDATE saved_strategies SET name = ?, underlying = ?, expiry = ?, legs = ? WHERE id = ?",
-            [req.name, req.underlying.upper(), date.fromisoformat(req.expiry), legs_json, strategy_id]
+            "UPDATE saved_strategies SET name = ?, underlying = ?, expiry = ?, legs = ?, config = ? WHERE id = ?",
+            [req.name, req.underlying.upper(), date.fromisoformat(req.expiry), legs_json, config_json, strategy_id]
         )
         storage.log_audit_event("STRATEGY_UPDATE", "STRATEGY", strategy_id, {"name": req.name})
         return {"status": "success"}
@@ -186,16 +190,16 @@ def _clone_strategy(strategy_id: str) -> Dict[str, Any]:
     con = storage.db().cursor()
     try:
         row = con.execute(
-            "SELECT name, underlying, expiry, legs FROM saved_strategies WHERE id = ?",
+            "SELECT name, underlying, expiry, legs, config FROM saved_strategies WHERE id = ?",
             [strategy_id]
         ).fetchone()
         if not row:
             raise HTTPException(404, "Strategy not found")
-        name, underlying, expiry, legs_json = row
+        name, underlying, expiry, legs_json, config_json = row
         new_id = str(uuid.uuid4())
         con.execute(
-            "INSERT INTO saved_strategies (id, name, underlying, expiry, created_at, legs) VALUES (?, ?, ?, ?, ?, ?)",
-            [new_id, f"Copy of {name}", underlying, expiry, datetime.now(), legs_json]
+            "INSERT INTO saved_strategies (id, name, underlying, expiry, created_at, legs, config) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [new_id, f"Copy of {name}", underlying, expiry, datetime.now(), legs_json, config_json]
         )
         storage.log_audit_event("STRATEGY_CLONE", "STRATEGY", new_id, {"source_id": strategy_id})
         return {"id": new_id, "status": "success"}
@@ -206,16 +210,18 @@ def _list_strategies() -> List[SavedStrategyResponse]:
     storage.init_db()
     con = storage.db().cursor()
     try:
-        rows = con.execute("SELECT id, name, underlying, expiry, created_at, legs FROM saved_strategies ORDER BY created_at DESC").fetchall()
+        rows = con.execute("SELECT id, name, underlying, expiry, created_at, legs, config FROM saved_strategies ORDER BY created_at DESC").fetchall()
         out = []
-        for r_id, name, underlying, expiry, created_at, legs_json in rows:
+        for r_id, name, underlying, expiry, created_at, legs_json, config_json in rows:
+            config = json.loads(config_json) if config_json else None
             out.append(SavedStrategyResponse(
                 id=r_id,
                 name=name,
                 underlying=underlying,
                 expiry=expiry.isoformat() if hasattr(expiry, "isoformat") else str(expiry),
                 created_at=created_at.isoformat() if hasattr(created_at, "isoformat") else str(created_at),
-                legs=[PayoffLegSpec(**l) for l in json.loads(legs_json)]
+                legs=[PayoffLegSpec(**l) for l in json.loads(legs_json)],
+                config=config
             ))
         return out
     finally:

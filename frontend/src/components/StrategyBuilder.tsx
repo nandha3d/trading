@@ -120,7 +120,25 @@ export default function StrategyBuilder({ onResult, onLoading }: Props) {
         entry_price: l.value || 100.0,
         underlying
       }));
-      await saveStrategy(strategyName, underlying, "2026-06-30", payoffLegs);
+      // Serialize full strategy builder configuration
+      const config = {
+        legs: legs.map(({ id: _id, ...rest }) => rest),
+        underlying,
+        start,
+        end,
+        entryTime,
+        exitTime,
+        expiryOffset,
+        exitConditions: exitConds,
+        entryConditions: entryConds,
+        indicators,
+        entrySignal,
+        exitSignal,
+      };
+      const nextExpiry = new Date();
+      nextExpiry.setDate(nextExpiry.getDate() + ((4 - nextExpiry.getDay() + 7) % 7 || 7));
+      const expiryStr = nextExpiry.toISOString().slice(0, 10);
+      await saveStrategy(strategyName, underlying, expiryStr, payoffLegs, config);
       setToast("Strategy saved successfully");
       refreshSaved();
     } catch (e: any) {
@@ -151,18 +169,41 @@ export default function StrategyBuilder({ onResult, onLoading }: Props) {
   const handleLoadSaved = (st: SavedStrategy) => {
     setStrategyName(st.name);
     setUnderlying(st.underlying as any);
-    setLegs(st.legs.map((l: any) => ({
-      id: Math.random().toString(36).slice(2),
-      action: l.action,
-      opt_type: l.opt_type,
-      selection: "ATM",
-      value: 0,
-      lots: l.lots,
-      sl_pct: null,
-      sl_unit: "PERCENT",
-      tp_pct: null,
-      tp_unit: "PERCENT"
-    })));
+
+    // If full config exists, restore all builder state from it
+    const cfg = (st as any).config;
+    if (cfg) {
+      if (cfg.legs) {
+        setLegs(cfg.legs.map((l: any) => ({
+          ...l,
+          id: Math.random().toString(36).slice(2),
+        })));
+      }
+      if (cfg.start) setStart(cfg.start);
+      if (cfg.end) setEnd(cfg.end);
+      if (cfg.entryTime) setEntryTime(cfg.entryTime);
+      if (cfg.exitTime) setExitTime(cfg.exitTime);
+      if (cfg.expiryOffset !== undefined) setExpiryOffset(cfg.expiryOffset);
+      if (cfg.exitConditions) setExitConds(cfg.exitConditions);
+      if (cfg.entryConditions) setEntryConds(cfg.entryConditions);
+      if (cfg.indicators) setIndicators(cfg.indicators);
+      if (cfg.entrySignal) setEntrySignal(cfg.entrySignal);
+      if (cfg.exitSignal) setExitSignal(cfg.exitSignal);
+    } else {
+      // Fallback: populate from basic leg data
+      setLegs(st.legs.map((l: any) => ({
+        id: Math.random().toString(36).slice(2),
+        action: l.action,
+        opt_type: l.opt_type,
+        selection: "ATM",
+        value: 0,
+        lots: l.lots,
+        sl_pct: null,
+        sl_unit: "PERCENT",
+        tp_pct: null,
+        tp_unit: "PERCENT"
+      })));
+    }
     setToast(`Saved strategy loaded: ${st.name}`);
   };
 

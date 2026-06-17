@@ -127,6 +127,7 @@ def _calculate_margin(underlying: str, legs: List[MarginLeg]) -> MarginEstimateR
 async def risk_precheck(req: RiskPrecheckRequest):
     warnings = []
     required_confirmations = []
+    allowed = True
     
     has_naked_sell = False
     has_sl = False
@@ -164,14 +165,80 @@ async def risk_precheck(req: RiskPrecheckRequest):
         ))
         required_confirmations.append("I acknowledge there is no defined stop loss rule.")
         
-    # Capital estimate warning
+    # Capital vs estimated margin — block trade if insufficient
     margin_req = 150000.0 * len(sell_legs)
+    # Apply hedge benefit (70% discount for hedged legs)
+    for l in sell_legs:
+        for h in buy_legs:
+            if h.opt_type.upper() == l.opt_type.upper():
+                margin_req -= 150000.0 * 0.70
+                break
+    margin_req = max(margin_req, 0)
+    
     if req.capital < margin_req:
         warnings.append(RiskWarning(
             code="INSUFFICIENT_CAPITAL",
             severity="HIGH",
-            message=f"Capital of {req.capital} is less than estimated margin requirements of {margin_req}."
+            message=f"Capital ₹{req.capital:,.0f} is less than estimated margin ₹{margin_req:,.0f}. Trade blocked."
         ))
+        allowed = False  # Block the trade
+        
+    # Daily max loss enforcement
+    daily_max_loss = req.capital * 0.03  # 3% of capital
+    try:
+        storage.init_db()
+        today_pnl = storage.get_daily_pnl(datetime.now().date())
+        if today_pnl is not None and today_pnl < -daily_max_loss:
+            warnings.append(RiskWarning(
+                code="DAILY_MAX_LOSS_BREACHED",
+                severity="HIGH",
+                message=f"Daily loss ₹{abs(today_pnl):,.0f} exceeds max daily loss limit ₹{daily_max_loss:,.0f}. New trades blocked."
+            ))
+            allowed = False
+    except Exception:
+        pass  # If daily PnL not available, skip
+        
+    # Max trades per day (limit: 10 trades)
+    MAX_TRADES_PER_DAY = 10
+    try:
+        today_trade_count = storage.get_daily_trade_count(datetime.now().date())
+        if today_trade_count >= MAX_TRADES_PER_DAY:
+            warnings.append(RiskWarning(
+                code="MAX_TRADES_EXCEEDED",
+                severity="MEDIUM",
+                message=f"Already placed {today_trade_count} trades today. Max limit is {MAX_TRADES_PER_DAY}."
+            ))
+            allowed = False
+    except Exception:
+        pass
+        
+    # Cooldown rule: prevent entry within 5 minutes of last exit
+    COOLDOWN_SECONDS = 300
+    try:
+        last_exit = storage.get_last_trade_exit_time()
+        if last_exit:
+            elapsed = (datetime.now() - last_exit).total_seconds()
+            if elapsed < COOLDOWN_SECONDS:
+                remaining = int(COOLDOWN_SECONDS - elapsed)
+                warnings.append(RiskWarning(
+                    code="COOLDOWN_ACTIVE",
+                    severity="LOW",
+                    message=f"Cooldown active. Wait {remaining}s before next entry."
+                ))
+    except Exception:
+        pass
+        
+    # Kill switch check
+    try:
+        if storage.is_kill_switch_active():
+            warnings.append(RiskWarning(
+                code="KILL_SWITCH_ACTIVE",
+                severity="HIGH",
+                message="Kill switch is active. All trading halted."
+            ))
+            allowed = False
+    except Exception:
+        pass
         
     # Risk Score
     score = 2
@@ -186,7 +253,6 @@ async def risk_precheck(req: RiskPrecheckRequest):
         
     score = min(score, 10)
     
-    levels = ["LOW", "MEDIUM", "HIGH", "VERY_HIGH"]
     if score <= 3:
         level = "LOW"
     elif score <= 6:
@@ -199,10 +265,11 @@ async def risk_precheck(req: RiskPrecheckRequest):
     return RiskPrecheckResponse(
         risk_score=score,
         risk_level=level,
-        allowed=True,
+        allowed=allowed,
         warnings=warnings,
         required_confirmations=required_confirmations
     )
+
 
 
 @router.post("/risk/margin-estimate", response_model=MarginEstimateResponse)
@@ -274,11 +341,29 @@ async def slippage_sensitivity(
 @router.post("/risk/kill-switch", response_model=KillSwitchResponse)
 async def kill_switch(req: KillSwitchRequest):
     storage.init_db()
+    # Activate kill switch in database
+    storage.activate_kill_switch(req.reason)
     # Log emergency override to audit trail
     storage.log_audit_event("KILL_SWITCH", "SYSTEM", None, {"scope": req.scope, "reason": req.reason})
     
+    # Count active/recent strategies that would be stopped
+    try:
+        today_count = storage.get_daily_trade_count(datetime.now().date())
+    except Exception:
+        today_count = 0
+    
     return KillSwitchResponse(
         status="STOPPED",
-        stopped_strategies=3,
+        stopped_strategies=today_count,
         timestamp=datetime.now().isoformat()
     )
+
+
+@router.post("/risk/kill-switch/reset")
+async def reset_kill_switch():
+    """Deactivate the kill switch to resume trading."""
+    storage.init_db()
+    storage.deactivate_kill_switch()
+    storage.log_audit_event("KILL_SWITCH_RESET", "SYSTEM", None)
+    return {"status": "ACTIVE", "timestamp": datetime.now().isoformat()}
+

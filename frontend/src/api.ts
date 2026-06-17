@@ -99,18 +99,19 @@ export async function saveStrategy(
   name: string,
   underlying: string,
   expiry: string,
-  legs: PayoffLegSpec[]
+  legs: PayoffLegSpec[],
+  config?: Record<string, any>
 ): Promise<{ id: string; status: string }> {
-  const res = await fetch(`${BASE}/strategies/save`, {
+  const res = await fetch(`${BASE}/strategies`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, underlying, expiry, legs }),
+    body: JSON.stringify({ name, underlying, expiry, legs, config }),
   });
   return _json<{ id: string; status: string }>(res);
 }
 
 export async function listStrategies(): Promise<SavedStrategy[]> {
-  const res = await fetch(`${BASE}/strategies/list`);
+  const res = await fetch(`${BASE}/strategies`);
   return _json<SavedStrategy[]>(res);
 }
 
@@ -120,6 +121,7 @@ export async function deleteStrategy(strategyId: string): Promise<{ status: stri
   });
   return _json<{ status: string }>(res);
 }
+
 
 export async function cloneStrategy(strategyId: string): Promise<{ id: string; status: string }> {
   const res = await fetch(`${BASE}/strategies/${strategyId}/clone`, {

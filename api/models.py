@@ -233,6 +233,7 @@ class SaveStrategyRequest(BaseModel):
     underlying: str
     expiry: str
     legs: list[PayoffLegSpec]
+    config: Optional[dict] = None
 
 
 class SavedStrategyResponse(BaseModel):
@@ -242,4 +243,6 @@ class SavedStrategyResponse(BaseModel):
     expiry: str
     created_at: str
     legs: list[PayoffLegSpec]
+    config: Optional[dict] = None
+
 
