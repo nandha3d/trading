@@ -114,7 +114,7 @@ def _filter_options(rows: list[dict], start: date, end: date) -> list[dict]:
             exp = _parse_expiry(exp_raw)
         except ValueError:
             continue
-        if not (start <= exp <= end):
+        if exp < start:
             continue
         key = (r.get("instrument_key") or "").strip()
         if not key:
