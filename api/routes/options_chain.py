@@ -216,194 +216,22 @@ async def get_options_chain_data(underlying: str, expiry: str, ts: str):
         raise HTTPException(500, f"Database error: {e}")
 
 
-class PayoffLeg(BaseModel):
-    action: str
-    opt_type: str
-    strike: int
-    lots: int
-    entry_price: float
-    underlying: str
 
-
-class PayoffRequest(BaseModel):
-    underlying: str
-    spot: float
-    expiry: str
-    current_date: str
-    r: Optional[float] = 0.065
-    legs: list[PayoffLeg]
-
-
-class PayoffCurvePoint(BaseModel):
-    spot: float
-    expiry_pnl: float
-    today_pnl: float
-
-
-class PayoffResponse(BaseModel):
-    curve: list[PayoffCurvePoint]
-    breakevens: list[float]
-    max_profit: Optional[float] = None
-    max_loss: Optional[float] = None
-    net_premium: float
-    net_greeks: dict[str, float]
-
-
-def _calculate_payoff(req: PayoffRequest) -> PayoffResponse:
-    underlying = req.underlying.upper()
-    spot = req.spot
-    expiry_date = date.fromisoformat(req.expiry)
-    current_dt = date.fromisoformat(req.current_date)
-    r = req.r or 0.065
-    
-    # Calculate DTE in years
-    days = (expiry_date - current_dt).days
-    T_start = max(0.0001, days) / 365.0
-    
-    from src.backtest.strategy import lot_size_for
-    from src.data.options_math import calculate_iv, calculate_greeks, bs_price
-
-    # date-aware lot (honours 1 Jan 2026 NSE revision)
-    lot_size = lot_size_for(underlying, expiry_date)
-    
-    legs_data = []
-    net_premium = 0.0
-    for leg in req.legs:
-        qty = leg.lots * lot_size
-        # Solve IV today
-        iv = calculate_iv(leg.entry_price, spot, leg.strike, T_start, r, leg.opt_type)
-        if iv <= 0:
-            iv = 0.15  # Fallback to standard volatility
-            
-        g = calculate_greeks(spot, leg.strike, T_start, r, iv, leg.opt_type)
-        
-        legs_data.append({
-            "leg": leg,
-            "qty": qty,
-            "iv": iv,
-            "greeks": g
-        })
-        
-        premium_val = leg.entry_price * qty
-        if leg.action.upper() == "BUY":
-            net_premium -= premium_val
-        else:
-            net_premium += premium_val
-            
-    # Generate payoff curve (±10% around spot)
-    curve: list[PayoffCurvePoint] = []
-    steps = 100
-    low_spot = spot * 0.90
-    high_spot = spot * 1.10
-    step_size = (high_spot - low_spot) / steps
-    
-    for i in range(steps + 1):
-        s_price = low_spot + i * step_size
-        expiry_pnl = 0.0
-        today_pnl = 0.0
-        
-        for item in legs_data:
-            leg = item["leg"]
-            qty = item["qty"]
-            iv = item["iv"]
-            
-            # Expiry P&L
-            if leg.opt_type.upper() == "CE":
-                intrinsic = max(0.0, s_price - leg.strike)
-            else:
-                intrinsic = max(0.0, leg.strike - s_price)
-                
-            if leg.action.upper() == "BUY":
-                leg_exp_pnl = (intrinsic - leg.entry_price) * qty
-            else:
-                leg_exp_pnl = (leg.entry_price - intrinsic) * qty
-            expiry_pnl += leg_exp_pnl
-            
-            # Today/T+0 P&L
-            new_price = bs_price(s_price, leg.strike, T_start, r, iv, leg.opt_type)
-            if leg.action.upper() == "BUY":
-                leg_today_pnl = (new_price - leg.entry_price) * qty
-            else:
-                leg_today_pnl = (leg.entry_price - new_price) * qty
-            today_pnl += leg_today_pnl
-            
-        curve.append(PayoffCurvePoint(
-            spot=round(s_price, 2),
-            expiry_pnl=round(expiry_pnl, 2),
-            today_pnl=round(today_pnl, 2)
-        ))
-        
-    # Scan wider range for max profit, max loss, and breakevens
-    scan_steps = 200
-    scan_low = spot * 0.5
-    scan_high = spot * 1.5
-    scan_step = (scan_high - scan_low) / scan_steps
-    
-    scan_pnl = []
-    for i in range(scan_steps + 1):
-        s_price = scan_low + i * scan_step
-        expiry_pnl = 0.0
-        for item in legs_data:
-            leg = item["leg"]
-            qty = item["qty"]
-            if leg.opt_type.upper() == "CE":
-                intrinsic = max(0.0, s_price - leg.strike)
-            else:
-                intrinsic = max(0.0, leg.strike - s_price)
-            if leg.action.upper() == "BUY":
-                expiry_pnl += (intrinsic - leg.entry_price) * qty
-            else:
-                expiry_pnl += (leg.entry_price - intrinsic) * qty
-        scan_pnl.append((s_price, expiry_pnl))
-        
-    # Determine if unlimited
-    buy_ce_qty = sum(item["qty"] for item in legs_data if item["leg"].action.upper() == "BUY" and item["leg"].opt_type.upper() == "CE")
-    sell_ce_qty = sum(item["qty"] for item in legs_data if item["leg"].action.upper() == "SELL" and item["leg"].opt_type.upper() == "CE")
-    buy_pe_qty = sum(item["qty"] for item in legs_data if item["leg"].action.upper() == "BUY" and item["leg"].opt_type.upper() == "PE")
-    sell_pe_qty = sum(item["qty"] for item in legs_data if item["leg"].action.upper() == "SELL" and item["leg"].opt_type.upper() == "PE")
-    
-    max_loss = None if (sell_ce_qty > buy_ce_qty or sell_pe_qty > buy_pe_qty) else round(min(p[1] for p in scan_pnl), 2)
-    max_profit = None if (buy_ce_qty > sell_ce_qty or buy_pe_qty > sell_pe_qty) else round(max(p[1] for p in scan_pnl), 2)
-    
-    # Breakevens
-    breakevens = []
-    for i in range(len(scan_pnl) - 1):
-        s1, p1 = scan_pnl[i]
-        s2, p2 = scan_pnl[i+1]
-        if (p1 <= 0 and p2 > 0) or (p1 > 0 and p2 <= 0):
-            be = s1 + (0 - p1) * (s2 - s1) / (p2 - p1)
-            breakevens.append(round(be, 2))
-            
-    # Portfolio Greeks
-    net_greeks = {"delta": 0.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0}
-    for item in legs_data:
-        leg = item["leg"]
-        qty = item["qty"]
-        g = item["greeks"]
-        mult = qty if leg.action.upper() == "BUY" else -qty
-        net_greeks["delta"] += g["delta"] * mult
-        net_greeks["gamma"] += g["gamma"] * mult
-        net_greeks["theta"] += g["theta"] * mult
-        net_greeks["vega"] += g["vega"] * mult
-        
-    for k in net_greeks:
-        net_greeks[k] = round(net_greeks[k], 4)
-        
-    return PayoffResponse(
-        curve=curve,
-        breakevens=breakevens,
-        max_profit=max_profit,
-        max_loss=max_loss,
-        net_premium=round(net_premium, 2),
-        net_greeks=net_greeks
-    )
-
-
-@router.post("/strategy/payoff", response_model=PayoffResponse)
-async def calculate_strategy_payoff(req: PayoffRequest):
+@router.get("/options-chain/expiries-for-date")
+async def expiries_for_date(underlying: str, date: str):
+    """Return expiries that have options data for the given date. Used for auto-expiry."""
+    def _query():
+        storage.init_db()
+        con = storage.db().cursor()
+        try:
+            rows = con.execute(
+                "SELECT DISTINCT expiry FROM options_1m WHERE underlying=? AND ts::DATE=? ORDER BY expiry",
+                [underlying.upper(), date],
+            ).fetchall()
+            return {"expiries": [r[0].isoformat() for r in rows]}
+        finally:
+            con.close()
     try:
-        return await asyncio.to_thread(_calculate_payoff, req)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
+        return await asyncio.to_thread(_query)
     except Exception as e:
-        raise HTTPException(500, f"Payoff calculation error: {e}")
+        raise HTTPException(500, str(e))

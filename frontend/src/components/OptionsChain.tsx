@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   getExpiries, getTradeDates, getOptionsChainData, getPayoffCurve,
-  saveStrategy, listStrategies, deleteStrategy
+  getExpiriesForDate, saveStrategy, listStrategies, deleteStrategy
 } from "../api";
 import type { OptionsChainResponse, PayoffResponse, SavedStrategy, PayoffLegSpec } from "../types";
 import {
@@ -140,6 +140,15 @@ export default function OptionsChain() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Debounced slider: triggers payoff recalc in historical mode after slider settles
+  const [debouncedSlider, setDebouncedSlider] = useState(sliderVal);
+
+  // SL / TP paper-trade config
+  const [slEnabled, setSlEnabled] = useState(false);
+  const [slPct, setSlPct] = useState(50);
+  const [tpEnabled, setTpEnabled] = useState(false);
+  const [tpPct, setTpPct] = useState(100);
+
   // Strategy Builder Workspace State (Opstra)
   const [legs, setLegs] = useState<BuilderLeg[]>([]);
   const [payoff, setPayoff] = useState<PayoffResponse | null>(null);
@@ -156,10 +165,56 @@ export default function OptionsChain() {
       .then(setSavedStrategies)
       .catch((e) => console.error("Failed to load saved strategies:", e));
   };
-  
+
   useEffect(() => {
     loadSaved();
   }, []);
+
+  // Debounce slider → triggers payoff recalc 500 ms after slider stops moving
+  useEffect(() => {
+    if (isLive) return;
+    const t = setTimeout(() => setDebouncedSlider(sliderVal), 500);
+    return () => clearTimeout(t);
+  }, [sliderVal, isLive]);
+
+  // Change date → auto-pick nearest valid expiry for that date from DB
+  const handleDateChange = (newDate: string) => {
+    setSelectedDate(newDate);
+    // Ask backend which expiries have data for this date
+    getExpiriesForDate(underlying, newDate)
+      .then((exps) => {
+        if (exps.length > 0 && exps[0] !== selectedExpiry) {
+          setSelectedExpiry(exps[0]);
+        } else if (exps.length === 0) {
+          // Fallback: pick nearest expiry >= date within 60 days
+          const d = new Date(newDate).getTime();
+          const nearby = expiries.find(e => {
+            const diff = (new Date(e).getTime() - d) / 86400000;
+            return diff >= 0 && diff <= 60;
+          });
+          if (nearby && nearby !== selectedExpiry) setSelectedExpiry(nearby);
+        }
+      })
+      .catch(() => {
+        const d = new Date(newDate).getTime();
+        const nearby = expiries.find(e => {
+          const diff = (new Date(e).getTime() - d) / 86400000;
+          return diff >= 0 && diff <= 60;
+        });
+        if (nearby && nearby !== selectedExpiry) setSelectedExpiry(nearby);
+      });
+  };
+
+  // Navigate to prev/next trading day
+  const goDay = (delta: number) => {
+    if (!selectedDate) return;
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + delta);
+    while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + delta);
+    // Don't go into the future
+    if (d > new Date()) return;
+    handleDateChange(localDateStr(d));
+  };
 
   // 1. Fetch expiries on mount or underlying change
   useEffect(() => {
@@ -399,7 +454,7 @@ export default function OptionsChain() {
         console.error("Payoff builder pricing error:", e);
         setPayoffLoading(false);
       });
-  }, [legs, selectedExpiry, liveExpiry, selectedDate, underlying, isLive]);
+  }, [legs, selectedExpiry, liveExpiry, selectedDate, underlying, isLive, debouncedSlider]);
 
   // Leg Builder triggers from Options Chain
   const addLeg = (strike: number, opt_type: "CE" | "PE", action: "BUY" | "SELL", entryPrice: number) => {
@@ -603,6 +658,13 @@ export default function OptionsChain() {
   const maxProfit = payoff?.max_profit !== undefined ? payoff.max_profit : null;
   const maxLoss = payoff?.max_loss !== undefined ? payoff.max_loss : null;
 
+  // SL / TP levels in ₹ (based on net premium of the position)
+  const premium = payoff ? Math.abs(payoff.net_premium) : 0;
+  const slLevel = slEnabled && payoff ? -(premium * slPct / 100) : null;
+  const tpLevel = tpEnabled && payoff ? (premium * tpPct / 100) : null;
+  const slHit = slLevel !== null && spotPnl !== null && spotPnl <= slLevel;
+  const tpHit = tpLevel !== null && spotPnl !== null && spotPnl >= tpLevel;
+
   return (
     <div className="flex flex-col h-full gap-6">
       {error && (
@@ -668,26 +730,23 @@ export default function OptionsChain() {
               )}
             </div>
 
-            {/* Date Select (disabled in Live mode) */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-500">Date</span>
-              <select
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className={inp}
-                disabled={tradeDates.length === 0 || isLive}
-              >
-                {isLive ? (
-                  <option>LIVE SESSION</option>
-                ) : tradeDates.length === 0 ? (
-                  <option>No dates</option>
-                ) : (
-                  tradeDates.map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))
-                )}
-              </select>
-            </div>
+            {/* Date picker + day navigation (hidden in live mode) */}
+            {!isLive && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-gray-500">Date</span>
+                <button onClick={() => goDay(-1)}
+                  className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-600 rounded text-xs text-gray-400"
+                  title="Previous trading day">◀</button>
+                <input type="date" value={selectedDate}
+                  onChange={(e) => handleDateChange(e.target.value)}
+                  max={localDateStr(new Date())}
+                  className={`${inp} min-w-[130px]`} />
+                <button onClick={() => goDay(1)}
+                  disabled={selectedDate >= localDateStr(new Date())}
+                  className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-600 rounded text-xs text-gray-400 disabled:opacity-30"
+                  title="Next trading day">▶</button>
+              </div>
+            )}
 
             {/* Live Today Toggle */}
             <button
@@ -696,6 +755,16 @@ export default function OptionsChain() {
                 setIsLive(next);
                 localStorage.setItem("oc_isLive", String(next));
                 setLegs([]);
+                if (!next) {
+                  // Default to most recent available date (first in tradeDates, or yesterday)
+                  const latest = tradeDates[0] ?? (() => {
+                    const y = new Date();
+                    if (y.getDay() === 1) y.setDate(y.getDate() - 3); // Monday → Friday
+                    else y.setDate(y.getDate() - 1);
+                    return localDateStr(y);
+                  })();
+                  handleDateChange(latest);
+                }
               }}
               title="Stream today's live market session (real broker feed during market hours)"
               className={`px-4 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-2 border transition-all ${
@@ -797,45 +866,50 @@ export default function OptionsChain() {
           </div>
         </div>
 
-        {/* Time Slider Panel (hidden in Live mode) */}
+        {/* Time + Day Navigator (hidden in Live mode) */}
         {!isLive && (
-          <div className="bg-gray-950 border border-gray-800/80 rounded-xl p-4 flex flex-col md:flex-row md:items-center gap-4">
-            <div className="flex items-center gap-3">
+          <div className="bg-gray-950 border border-gray-800/80 rounded-xl p-3 flex flex-wrap items-center gap-3">
+            {/* Day navigation */}
+            <div className="flex items-center gap-1.5 border-r border-gray-800 pr-3">
+              <button onClick={() => goDay(-1)}
+                className="w-7 h-7 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-600 rounded-lg text-xs text-gray-400"
+                title="Previous day">◀</button>
+              <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 min-w-[88px] text-center">
+                {selectedDate || "—"}
+              </span>
+              <button onClick={() => goDay(1)}
+                disabled={!selectedDate || selectedDate >= localDateStr(new Date())}
+                className="w-7 h-7 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-600 rounded-lg text-xs text-gray-400 disabled:opacity-30"
+                title="Next day">▶</button>
+            </div>
+
+            {/* Time display */}
+            <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500 uppercase tracking-widest font-semibold">Time:</span>
-              <span className="text-sm font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md border border-blue-500/20 w-[100px] text-center">
+              <span className="text-sm font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-md border border-blue-500/20 w-[92px] text-center">
                 {formatDisplayTime(sliderVal)}
               </span>
             </div>
 
-            <div className="flex-1 flex items-center gap-3">
-              <button
-                onClick={() => setSliderVal((v) => Math.max(555, v - 1))}
-                disabled={sliderVal <= 555}
-                className="w-7 h-7 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-lg text-xs text-gray-400 disabled:opacity-30"
-              >
-                ◀
-              </button>
-              <input
-                type="range"
-                min={555}
-                max={930}
-                value={sliderVal}
+            {/* Time slider */}
+            <div className="flex-1 flex items-center gap-2 min-w-[200px]">
+              <button onClick={() => setSliderVal((v) => Math.max(555, v - 1))} disabled={sliderVal <= 555}
+                className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-700 rounded text-xs text-gray-400 disabled:opacity-30">◀</button>
+              <input type="range" min={555} max={930} value={sliderVal}
                 onChange={(e) => setSliderVal(Number(e.target.value))}
-                className="flex-1 accent-blue-500 h-1 bg-gray-800 rounded-lg cursor-pointer"
-              />
-              <button
-                onClick={() => setSliderVal((v) => Math.min(930, v + 1))}
-                disabled={sliderVal >= 930}
-                className="w-7 h-7 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-lg text-xs text-gray-400 disabled:opacity-30"
-              >
-                ▶
-              </button>
+                className="flex-1 accent-blue-500 h-1 bg-gray-800 rounded-lg cursor-pointer" />
+              <button onClick={() => setSliderVal((v) => Math.min(930, v + 1))} disabled={sliderVal >= 930}
+                className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-700 rounded text-xs text-gray-400 disabled:opacity-30">▶</button>
             </div>
 
-            <div className="flex gap-2">
-              <button onClick={() => setSliderVal(555)} className="px-2 py-1 bg-gray-900 border border-gray-800 rounded text-[10px] text-gray-400 hover:text-white">Open</button>
-              <button onClick={() => setSliderVal(720)} className="px-2 py-1 bg-gray-900 border border-gray-800 rounded text-[10px] text-gray-400 hover:text-white">12 PM</button>
-              <button onClick={() => setSliderVal(930)} className="px-2 py-1 bg-gray-900 border border-gray-800 rounded text-[10px] text-gray-400 hover:text-white">Close</button>
+            {/* Time presets */}
+            <div className="flex gap-1.5">
+              {[["Open", 555], ["12 PM", 720], ["Close", 930]].map(([lbl, val]) => (
+                <button key={lbl as string} onClick={() => setSliderVal(val as number)}
+                  className={`px-2 py-1 rounded border text-[10px] transition-colors ${sliderVal === val ? "bg-blue-900/40 border-blue-700/50 text-blue-300" : "bg-gray-900 border-gray-800 text-gray-400 hover:text-white"}`}>
+                  {lbl}
+                </button>
+              ))}
             </div>
           </div>
         )}
@@ -1434,6 +1508,16 @@ export default function OptionsChain() {
                           label={{ value: "SPOT", fill: "#22c55e", fontSize: 8, position: "top" }} />
                       )}
 
+                      {/* SL / TP horizontal levels */}
+                      {slLevel !== null && (
+                        <ReferenceLine y={slLevel} stroke={slHit ? "#ef4444" : "#f97316"} strokeWidth={1.5} strokeDasharray="5 3"
+                          label={{ value: `SL ${slPct}%`, fill: slHit ? "#ef4444" : "#f97316", fontSize: 8, position: "insideLeft" }} />
+                      )}
+                      {tpLevel !== null && (
+                        <ReferenceLine y={tpLevel} stroke={tpHit ? "#22c55e" : "#a3e635"} strokeWidth={1.5} strokeDasharray="5 3"
+                          label={{ value: `TP ${tpPct}%`, fill: tpHit ? "#22c55e" : "#a3e635", fontSize: 8, position: "insideLeft" }} />
+                      )}
+
                       {/* Projected P&L dot at current spot price */}
                       {spotPrice && spotPnl !== null && (() => {
                         const projPnl = Math.round(spotPnl + ivImpact);
@@ -1551,6 +1635,85 @@ export default function OptionsChain() {
                         </div>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Paper Trade — SL / TP Monitor */}
+                  <div className="bg-gray-950 border border-gray-800 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Paper Trade Monitor</h4>
+                      {/* Live status badge */}
+                      {(slHit || tpHit) && (
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold animate-pulse ${tpHit ? "bg-green-900/60 text-green-300 border border-green-700/50" : "bg-red-900/60 text-red-300 border border-red-700/50"}`}>
+                          {tpHit ? "TARGET HIT ✓" : "SL HIT ✗"}
+                        </span>
+                      )}
+                      {!slHit && !tpHit && (slEnabled || tpEnabled) && spotPnl !== null && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-900/30 text-blue-300 border border-blue-700/30">RUNNING</span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Stop Loss */}
+                      <div className={`p-3 rounded-lg border ${slEnabled ? (slHit ? "border-red-600/60 bg-red-950/30" : "border-orange-700/40 bg-orange-950/10") : "border-gray-800 bg-gray-900/30"}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Stop Loss</span>
+                          <label className="flex items-center gap-1 cursor-pointer">
+                            <input type="checkbox" checked={slEnabled} onChange={e => setSlEnabled(e.target.checked)}
+                              className="accent-orange-500 w-3 h-3" />
+                            <span className="text-[9px] text-gray-500">Enable</span>
+                          </label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input type="number" min={1} max={200} value={slPct}
+                            onChange={e => setSlPct(Math.max(1, Number(e.target.value)))}
+                            disabled={!slEnabled}
+                            className="w-14 bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5 text-[11px] text-white font-mono text-right focus:outline-none focus:border-orange-500 disabled:opacity-40" />
+                          <span className="text-[10px] text-gray-500">% of premium</span>
+                        </div>
+                        {slEnabled && slLevel !== null && (
+                          <div className={`mt-1 text-[10px] font-mono font-bold ${slHit ? "text-red-400" : "text-orange-400"}`}>
+                            = ₹{Math.abs(slLevel).toLocaleString("en-IN")}
+                          </div>
+                        )}
+                      </div>
+                      {/* Take Profit */}
+                      <div className={`p-3 rounded-lg border ${tpEnabled ? (tpHit ? "border-green-600/60 bg-green-950/30" : "border-lime-700/40 bg-lime-950/10") : "border-gray-800 bg-gray-900/30"}`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Take Profit</span>
+                          <label className="flex items-center gap-1 cursor-pointer">
+                            <input type="checkbox" checked={tpEnabled} onChange={e => setTpEnabled(e.target.checked)}
+                              className="accent-green-500 w-3 h-3" />
+                            <span className="text-[9px] text-gray-500">Enable</span>
+                          </label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input type="number" min={1} max={500} value={tpPct}
+                            onChange={e => setTpPct(Math.max(1, Number(e.target.value)))}
+                            disabled={!tpEnabled}
+                            className="w-14 bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5 text-[11px] text-white font-mono text-right focus:outline-none focus:border-green-500 disabled:opacity-40" />
+                          <span className="text-[10px] text-gray-500">% of premium</span>
+                        </div>
+                        {tpEnabled && tpLevel !== null && (
+                          <div className={`mt-1 text-[10px] font-mono font-bold ${tpHit ? "text-green-400" : "text-lime-400"}`}>
+                            = ₹{tpLevel.toLocaleString("en-IN")}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Current P&L vs levels */}
+                    {spotPnl !== null && (slEnabled || tpEnabled) && (
+                      <div className="flex items-center gap-3 pt-1 border-t border-gray-800 text-[10px] font-mono">
+                        <span className="text-gray-500">Live P&amp;L:</span>
+                        <span className={`font-bold ${spotPnl >= 0 ? "text-green-400" : "text-red-400"}`}>
+                          {spotPnl >= 0 ? "+" : ""}₹{Math.round(spotPnl).toLocaleString("en-IN")}
+                        </span>
+                        {slEnabled && slLevel !== null && (
+                          <span className="text-gray-600">SL at ₹{Math.abs(slLevel).toLocaleString("en-IN")} ({((1 - (slLevel / (spotPnl || -1))) * 100).toFixed(0)}% away)</span>
+                        )}
+                        {tpEnabled && tpLevel !== null && (
+                          <span className="text-gray-600">TP at ₹{tpLevel.toLocaleString("en-IN")}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

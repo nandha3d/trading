@@ -69,6 +69,13 @@ export async function getTradeDates(underlying: string, expiry: string): Promise
   return data.dates;
 }
 
+export async function getExpiriesForDate(underlying: string, date: string): Promise<string[]> {
+  const p = new URLSearchParams({ underlying, date });
+  const res = await fetch(`${BASE}/options-chain/expiries-for-date?${p}`);
+  const data = await _json<{ expiries: string[] }>(res);
+  return data.expiries;
+}
+
 export async function getOptionsChainData(
   underlying: string,
   expiry: string,
