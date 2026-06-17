@@ -13,6 +13,11 @@ interface BuilderLeg extends PayoffLegSpec {
   id: string;
   visible: boolean;   // include this leg in the payoff visualization
   expiry: string;     // per-leg expiry; enables calendar/diagonal spreads
+  entry_time?: string;    // ISO string when leg was paper-entered
+  sl_enabled?: boolean;
+  sl_pct?: number;        // % of entry premium for stop-loss trigger
+  tp_enabled?: boolean;
+  tp_pct?: number;        // % of entry premium for take-profit trigger
 }
 
 // Current (post-1-Jan-2026 NSE revision) lot sizes — fallback only; the live
@@ -151,6 +156,9 @@ export default function OptionsChain() {
 
   // Strategy Builder Workspace State (Opstra)
   const [legs, setLegs] = useState<BuilderLeg[]>([]);
+  const [expandedLegs, setExpandedLegs] = useState<Set<string>>(new Set());
+  const toggleLegExpand = (id: string) =>
+    setExpandedLegs(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
   const [payoff, setPayoff] = useState<PayoffResponse | null>(null);
   const [payoffLoading, setPayoffLoading] = useState(false);
   
@@ -470,6 +478,9 @@ export default function OptionsChain() {
       underlying,
       visible: true,
       expiry: chainExpiry,
+      entry_time: new Date().toISOString(),
+      sl_enabled: false, sl_pct: 50,
+      tp_enabled: false, tp_pct: 50,
     };
     setLegs((prev) => [...prev, newLeg]);
   };
@@ -1281,6 +1292,7 @@ export default function OptionsChain() {
                 <table className="w-full text-xs font-mono border-collapse">
                   <thead>
                     <tr className="text-[9px] text-gray-500 uppercase tracking-wider border-b border-gray-800">
+                      <th className="py-1.5 px-1 text-center w-5" />
                       <th className="py-1.5 px-1 text-center" title="Show in payoff">👁</th>
                       <th className="py-1.5 px-1 text-left">B/S</th>
                       <th className="py-1.5 px-1 text-center">Strike</th>
@@ -1298,12 +1310,34 @@ export default function OptionsChain() {
                       const currentLtp = getLegLtp(data, leg);
                       const pnl = getLegPnl(data, leg);
                       const isBuy = leg.action === "BUY";
-                      // Row tint by side; dimmed when excluded from the payoff.
                       const rowTint = isBuy ? "bg-emerald-950/15" : "bg-rose-950/15";
                       const strikeOpts = data?.chain?.map((r) => r.strike) ?? [];
+                      const isExpanded = expandedLegs.has(leg.id);
+
+                      // Per-leg SL/TP levels and hit detection
+                      const slPct = leg.sl_pct ?? 50;
+                      const tpPct = leg.tp_pct ?? 50;
+                      const slPrice = isBuy
+                        ? leg.entry_price * (1 - slPct / 100)
+                        : leg.entry_price * (1 + slPct / 100);
+                      const tpPrice = isBuy
+                        ? leg.entry_price * (1 + tpPct / 100)
+                        : leg.entry_price * (1 - tpPct / 100);
+                      const legSlHit = leg.sl_enabled && currentLtp !== null && (isBuy ? currentLtp <= slPrice : currentLtp >= slPrice);
+                      const legTpHit = leg.tp_enabled && currentLtp !== null && (isBuy ? currentLtp >= tpPrice : currentLtp <= tpPrice);
+
                       return (
+                        <>
                         <tr key={leg.id}
-                          className={`transition-colors ${rowTint} ${leg.visible ? "" : "opacity-40"} hover:bg-gray-900/60`}>
+                          className={`transition-colors ${rowTint} ${leg.visible ? "" : "opacity-40"} hover:bg-gray-900/60 ${isExpanded ? "border-b-0" : ""}`}>
+                          {/* Expand/collapse toggle */}
+                          <td className="py-1.5 px-1 text-center">
+                            <button onClick={() => toggleLegExpand(leg.id)}
+                              className={`text-[9px] transition-all w-4 h-4 flex items-center justify-center rounded ${isExpanded ? "text-blue-400 bg-blue-900/30" : "text-gray-600 hover:text-gray-300"}`}
+                              title="Expand leg details">
+                              {isExpanded ? "▼" : "▶"}
+                            </button>
+                          </td>
                           <td className="py-1.5 px-1 text-center">
                             <input type="checkbox" checked={leg.visible}
                               onChange={() => handleToggleVisible(leg.id)}
@@ -1380,13 +1414,129 @@ export default function OptionsChain() {
                             </td>
                           )}
                           <td className="py-1.5 px-1 text-center">
-                            <button
-                              onClick={() => handleRemoveLeg(leg.id)}
-                              className="text-gray-600 hover:text-red-400 transition-colors text-xs"
-                              title="Remove"
-                            >🗑</button>
+                            <div className="flex items-center gap-1">
+                              {(legSlHit || legTpHit) && (
+                                <span className={`text-[8px] font-extrabold px-1 py-0.5 rounded animate-pulse ${legTpHit ? "bg-green-900/50 text-green-300" : "bg-red-900/50 text-red-300"}`}>
+                                  {legTpHit ? "TP" : "SL"}
+                                </span>
+                              )}
+                              <button
+                                onClick={() => handleRemoveLeg(leg.id)}
+                                className="text-gray-600 hover:text-red-400 transition-colors text-xs"
+                                title="Remove"
+                              >🗑</button>
+                            </div>
                           </td>
                         </tr>
+
+                        {/* Accordion: SL/TP + entry time per leg */}
+                        {isExpanded && (
+                          <tr key={`${leg.id}-detail`} className={`${rowTint}`}>
+                            <td colSpan={isLive ? 11 : 10} className="px-3 pb-3 pt-1">
+                              <div className="bg-gray-950/80 border border-gray-800 rounded-xl p-3 space-y-3">
+                                {/* Entry time */}
+                                <div className="flex items-center gap-4 text-[10px]">
+                                  <span className="text-gray-500 uppercase tracking-wider font-bold">Entry Time</span>
+                                  <span className="font-mono text-gray-300">
+                                    {leg.entry_time
+                                      ? new Date(leg.entry_time).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+                                      : "—"}
+                                  </span>
+                                  <span className="font-mono text-gray-500">
+                                    {leg.entry_time ? new Date(leg.entry_time).toLocaleDateString("en-IN") : ""}
+                                  </span>
+                                  <button
+                                    onClick={() => handleUpdateLeg(leg.id, { entry_time: new Date().toISOString() })}
+                                    className="ml-auto px-2 py-0.5 rounded bg-gray-800 text-gray-400 hover:text-white text-[9px] border border-gray-700">
+                                    Reset to now
+                                  </button>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                  {/* Stop Loss */}
+                                  <div className={`p-2.5 rounded-lg border ${leg.sl_enabled ? (legSlHit ? "border-red-600/60 bg-red-950/20" : "border-orange-700/40 bg-orange-950/10") : "border-gray-800"}`}>
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Stop Loss</span>
+                                      <label className="flex items-center gap-1 cursor-pointer">
+                                        <input type="checkbox" checked={leg.sl_enabled ?? false}
+                                          onChange={e => handleUpdateLeg(leg.id, { sl_enabled: e.target.checked })}
+                                          className="accent-orange-500 w-3 h-3" />
+                                        <span className="text-[9px] text-gray-500">On</span>
+                                      </label>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <input type="number" min={1} max={200} value={slPct}
+                                        onChange={e => handleUpdateLeg(leg.id, { sl_pct: Math.max(1, Number(e.target.value)) })}
+                                        disabled={!leg.sl_enabled}
+                                        className="w-14 bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5 text-[10px] text-white font-mono text-right focus:outline-none focus:border-orange-500 disabled:opacity-40" />
+                                      <span className="text-[9px] text-gray-500">%</span>
+                                      {leg.sl_enabled && (
+                                        <span className={`ml-auto text-[10px] font-mono font-bold ${legSlHit ? "text-red-400 animate-pulse" : "text-orange-400"}`}>
+                                          @ ₹{slPrice.toFixed(1)} {legSlHit ? "⚠ HIT" : ""}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {leg.sl_enabled && (
+                                      <div className="mt-1.5 text-[9px] text-gray-600">
+                                        {isBuy ? `Exit if LTP ≤ ₹${slPrice.toFixed(1)} (buy side)` : `Exit if LTP ≥ ₹${slPrice.toFixed(1)} (sell side)`}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Take Profit */}
+                                  <div className={`p-2.5 rounded-lg border ${leg.tp_enabled ? (legTpHit ? "border-green-600/60 bg-green-950/20" : "border-lime-700/40 bg-lime-950/10") : "border-gray-800"}`}>
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Take Profit</span>
+                                      <label className="flex items-center gap-1 cursor-pointer">
+                                        <input type="checkbox" checked={leg.tp_enabled ?? false}
+                                          onChange={e => handleUpdateLeg(leg.id, { tp_enabled: e.target.checked })}
+                                          className="accent-green-500 w-3 h-3" />
+                                        <span className="text-[9px] text-gray-500">On</span>
+                                      </label>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <input type="number" min={1} max={500} value={tpPct}
+                                        onChange={e => handleUpdateLeg(leg.id, { tp_pct: Math.max(1, Number(e.target.value)) })}
+                                        disabled={!leg.tp_enabled}
+                                        className="w-14 bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5 text-[10px] text-white font-mono text-right focus:outline-none focus:border-green-500 disabled:opacity-40" />
+                                      <span className="text-[9px] text-gray-500">%</span>
+                                      {leg.tp_enabled && (
+                                        <span className={`ml-auto text-[10px] font-mono font-bold ${legTpHit ? "text-green-400 animate-pulse" : "text-lime-400"}`}>
+                                          @ ₹{tpPrice.toFixed(1)} {legTpHit ? "✓ HIT" : ""}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {leg.tp_enabled && (
+                                      <div className="mt-1.5 text-[9px] text-gray-600">
+                                        {isBuy ? `Exit if LTP ≥ ₹${tpPrice.toFixed(1)} (buy side)` : `Exit if LTP ≤ ₹${tpPrice.toFixed(1)} (sell side)`}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Status row */}
+                                <div className="flex items-center gap-3 pt-1 border-t border-gray-800/60 text-[9px] font-mono">
+                                  <span className="text-gray-600">Entry: ₹{leg.entry_price.toFixed(2)}</span>
+                                  {currentLtp !== null && <span className="text-gray-500">LTP: ₹{currentLtp.toFixed(2)}</span>}
+                                  {pnl !== null && (
+                                    <span className={pnl >= 0 ? "text-green-400" : "text-red-400"}>
+                                      Leg P&L: {pnl >= 0 ? "+" : ""}₹{Math.round(pnl).toLocaleString("en-IN")}
+                                    </span>
+                                  )}
+                                  <span className={`ml-auto px-2 py-0.5 rounded font-bold text-[9px] ${
+                                    legTpHit ? "bg-green-900/50 text-green-300" :
+                                    legSlHit ? "bg-red-900/50 text-red-300 animate-pulse" :
+                                    (leg.sl_enabled || leg.tp_enabled) ? "bg-blue-900/30 text-blue-400" :
+                                    "bg-gray-800 text-gray-600"
+                                  }`}>
+                                    {legTpHit ? "TARGET HIT" : legSlHit ? "SL HIT" : (leg.sl_enabled || leg.tp_enabled) ? "RUNNING" : "NO GUARD"}
+                                  </span>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                        </>
                       );
                     })}
                   </tbody>
