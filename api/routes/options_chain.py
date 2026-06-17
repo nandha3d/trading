@@ -110,17 +110,33 @@ def _get_options_chain_data(underlying: str, expiry: str, ts: str):
         ).fetchone()
         spot_price: Optional[float] = spot_row[0] if spot_row else None
 
+        # Snap to nearest stored timestamp: latest at-or-before requested time,
+        # fallback to earliest on that day (handles EOD-only bhav data).
+        day_date = ts_val.date()
+        snap_row = con.execute(
+            """SELECT ts FROM options_1m
+               WHERE underlying = ? AND expiry = ? AND CAST(ts AS DATE) = ? AND ts <= ?
+               ORDER BY ts DESC LIMIT 1""",
+            [und, exp_date, day_date, ts_val],
+        ).fetchone()
+        if not snap_row:
+            snap_row = con.execute(
+                """SELECT ts FROM options_1m
+                   WHERE underlying = ? AND expiry = ? AND CAST(ts AS DATE) = ?
+                   ORDER BY ts LIMIT 1""",
+                [und, exp_date, day_date],
+            ).fetchone()
+        actual_ts = snap_row[0] if snap_row else ts_val
+
         options_rows = con.execute(
             """
             SELECT strike, option_type, close, volume, oi
             FROM options_1m
             WHERE underlying = ? AND expiry = ? AND ts = ?
             """,
-            [und, exp_date, ts_val],
+            [und, exp_date, actual_ts],
         ).fetchall()
 
-        # OI at day open (for oi_change)
-        day_date = ts_val.date()
         open_ts_row = con.execute(
             "SELECT MIN(ts) FROM options_1m WHERE underlying = ? AND expiry = ? AND CAST(ts AS DATE) = ?",
             [und, exp_date, day_date],
