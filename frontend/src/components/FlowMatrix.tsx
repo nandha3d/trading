@@ -65,11 +65,13 @@ function chg(n: number) {
 }
 
 export default function FlowMatrix() {
+  const todayISO = () => new Date().toISOString().slice(0, 10);
+
   const [sub, setSub] = useState<Sub>("dots");
   const [mode, setMode] = useState<Mode>("live");
   const [underlying, setUnderlying] = useState("BANKNIFTY");
   const [dates, setDates] = useState<string[]>([]);
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(todayISO);   // default today (live mode)
   const [interval, setIntv] = useState(15);
 
   const [dots, setDots] = useState<DotsResponse | null>(null);
@@ -84,13 +86,20 @@ export default function FlowMatrix() {
   const [tools, setTools] = useState<OiToolsResponse | null>(null);
   const [showChart, setShowChart] = useState(true);
 
-  // Live OI-flow (institutional dashboard) — polls /flow/live while mode=live
+  // Live OI-flow (institutional dashboard) — polls /flow/live while mode=live + sub=dots
   const [liveFlow, setLiveFlow] = useState<FlowLiveResponse | null>(null);
   const [liveErr, setLiveErr] = useState<string | null>(null);
   const livePoll = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Live OI tool polling (non-dots tabs in live mode, slower refresh)
+  const toolPoll = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // When switching to live mode, snap date to today
+  useEffect(() => {
+    if (mode === "live") setDate(todayISO());
+  }, [mode]);
 
   useEffect(() => {
-    if (mode !== "live") {
+    if (mode !== "live" || sub !== "dots") {
       if (livePoll.current) { clearInterval(livePoll.current); livePoll.current = null; }
       return;
     }
@@ -103,12 +112,16 @@ export default function FlowMatrix() {
     tick();
     livePoll.current = setInterval(tick, 4000);
     return () => { cancelled = true; if (livePoll.current) { clearInterval(livePoll.current); livePoll.current = null; } };
-  }, [mode, underlying]);
+  }, [mode, underlying, sub]);
 
   useEffect(() => {
-    getFlowDates(underlying).then((d) => { setDates(d); if (d.length && !d.includes(date)) setDate(d[0]); }).catch(() => setDates([]));
+    getFlowDates(underlying).then((d) => {
+      setDates(d);
+      // In historical mode, default to most recent date; live mode keeps today
+      if (mode === "historical" && d.length) setDate(d[0]);
+    }).catch(() => setDates([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [underlying]);
+  }, [underlying, mode]);
 
   useEffect(() => {
     if (!needsExpiry(sub) || !date) return;
@@ -123,7 +136,7 @@ export default function FlowMatrix() {
   }, [sub, underlying, date, expiry]);
 
   const go = useCallback(() => {
-    if (sub === "risk") return;
+    if (sub === "risk" || sub === "fii") return;
     if (!date) return;
     setLoading(true); setErr(null);
     const done = () => setLoading(false);
@@ -137,6 +150,19 @@ export default function FlowMatrix() {
       getOiTools(underlying, date, expiry, interval).then((d) => { setTools(d); done(); }).catch(fail);
     }
   }, [sub, underlying, date, interval, mode, expiry, strike]);
+
+  // In live mode, auto-run OI tool tabs when expiry (and strike for oi) are ready
+  useEffect(() => {
+    if (mode !== "live" || sub === "dots" || sub === "risk" || sub === "fii") return;
+    if (!expiry) return;
+    if (sub === "oi" && strike === "") return;
+    go();
+    // Poll every 30s in live mode for OI tools
+    if (toolPoll.current) clearInterval(toolPoll.current);
+    toolPoll.current = setInterval(go, 30000);
+    return () => { if (toolPoll.current) { clearInterval(toolPoll.current); toolPoll.current = null; } };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, sub, underlying, expiry, strike, interval]);
 
   return (
     <div className="space-y-4">
@@ -166,13 +192,27 @@ export default function FlowMatrix() {
             </div>
           </div>
           <Field label="Name"><select className={inp} value={underlying} onChange={(e) => setUnderlying(e.target.value)}><option>BANKNIFTY</option><option>NIFTY</option></select></Field>
-          {/* Historical controls — also available in live mode for the OI tool tabs */}
+          {/* In live mode show today badge; historical shows date select */}
+          {mode === "live" && sub !== "dots" && (
+            <Field label="Date">
+              <div className="px-3 py-1.5 rounded-lg bg-emerald-900/30 border border-emerald-700/40 text-xs text-emerald-400 font-mono font-bold">{date} · TODAY</div>
+            </Field>
+          )}
+          {mode === "historical" && (
+            <Field label="Date"><select className={inp} value={date} onChange={(e) => setDate(e.target.value)}>{dates.length === 0 && <option>—</option>}{dates.map((d) => <option key={d}>{d}</option>)}</select></Field>
+          )}
+          {/* Expiry / strike / interval — always shown for tool tabs */}
           {(mode === "historical" || (mode === "live" && sub !== "dots")) && <>
-            {mode === "historical" && <Field label="Date"><select className={inp} value={date} onChange={(e) => setDate(e.target.value)}>{dates.length === 0 && <option>—</option>}{dates.map((d) => <option key={d}>{d}</option>)}</select></Field>}
             {needsExpiry(sub) && <Field label="Expiry"><select className={inp} value={expiry} onChange={(e) => setExpiry(e.target.value)}>{expiries.length === 0 && <option>—</option>}{expiries.map((x) => <option key={x}>{x}</option>)}</select></Field>}
             {sub === "oi" && <Field label="Strike"><select className={inp} value={strike} onChange={(e) => setStrike(Number(e.target.value))}>{strikes.length === 0 && <option>—</option>}{strikes.map((s) => <option key={s} value={s}>{s}</option>)}</select></Field>}
             <Field label="Interval"><select className={inp} value={interval} onChange={(e) => setIntv(Number(e.target.value))}>{INTERVALS.map((m) => <option key={m} value={m}>{m} min</option>)}</select></Field>
-            <button onClick={go} disabled={loading || (!date && mode === "historical")} className="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-bold">{loading ? "Loading…" : "Go"}</button>
+            <button onClick={go} disabled={loading} className="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-bold">{loading ? "Loading…" : "Go"}</button>
+            {mode === "live" && (
+              <div className="flex items-center gap-1.5 self-center">
+                <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" /></span>
+                <span className="text-[10px] text-emerald-400 font-semibold">auto-refresh 30s</span>
+              </div>
+            )}
           </>}
           {mode === "live" && sub === "dots" && (
             <div className="flex items-center gap-2 px-2 py-2 self-center">
