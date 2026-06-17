@@ -160,6 +160,7 @@ export interface BacktestResponse {
   trades: TradeResult[];
   equity_curve: number[];
   skipped_days: number;
+  run_id?: string;
 }
 
 export interface DbStatus {

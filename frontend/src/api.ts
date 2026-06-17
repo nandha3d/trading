@@ -121,6 +121,13 @@ export async function deleteStrategy(strategyId: string): Promise<{ status: stri
   return _json<{ status: string }>(res);
 }
 
+export async function cloneStrategy(strategyId: string): Promise<{ id: string; status: string }> {
+  const res = await fetch(`${BASE}/strategies/${strategyId}/clone`, {
+    method: "POST",
+  });
+  return _json<{ id: string; status: string }>(res);
+}
+
 // ---- FlowMatrix ----
 
 export async function getFlowDates(underlying: string): Promise<string[]> {
@@ -230,3 +237,103 @@ export async function getCandles(
   const data = await _json<{ candles: Candle[] }>(res);
   return data.candles;
 }
+
+// ---- New Core Features APIs ----
+
+export async function getMarketSnapshot(underlying: string): Promise<any> {
+  const res = await fetch(`${BASE}/market/snapshot?underlying=${underlying}`);
+  return _json<any>(res);
+}
+
+export async function getMarketCandles(
+  underlying: string,
+  interval: string,
+  fromDate: string,
+  toDate: string
+): Promise<any> {
+  const p = new URLSearchParams({ underlying, interval, from_date: fromDate, to_date: toDate });
+  const res = await fetch(`${BASE}/market/candles?${p.toString()}`);
+  return _json<any>(res);
+}
+
+export async function getOiBuildup(underlying: string, expiry: string): Promise<any> {
+  const p = new URLSearchParams({ underlying, expiry });
+  const res = await fetch(`${BASE}/options/oi-buildup?${p.toString()}`);
+  return _json<any>(res);
+}
+
+export async function getMarketLevels(underlying: string, expiry: string): Promise<any> {
+  const p = new URLSearchParams({ underlying, expiry });
+  const res = await fetch(`${BASE}/market/levels?${p.toString()}`);
+  return _json<any>(res);
+}
+
+export async function getMarketAlerts(underlying: string): Promise<any> {
+  const res = await fetch(`${BASE}/market/alerts?underlying=${underlying}`);
+  return _json<any>(res);
+}
+
+export async function getTemplates(): Promise<any> {
+  const res = await fetch(`${BASE}/strategies/templates`);
+  return _json<any>(res);
+}
+
+export async function validateStrategy(strategy: any): Promise<any> {
+  const res = await fetch(`${BASE}/strategies/validate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(strategy)
+  });
+  return _json<any>(res);
+}
+
+export async function getBacktestHistory(): Promise<any> {
+  const res = await fetch(`${BASE}/backtests/history`);
+  return _json<any>(res);
+}
+
+export async function getBacktestAnalytics(runId: string): Promise<any> {
+  const res = await fetch(`${BASE}/backtests/${runId}/analytics`);
+  return _json<any>(res);
+}
+
+export function exportBacktestUrl(runId: string): string {
+  return `${BASE}/backtests/${runId}/export`;
+}
+
+export async function runPrecheck(req: any): Promise<any> {
+  const res = await fetch(`${BASE}/risk/precheck`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req)
+  });
+  return _json<any>(res);
+}
+
+export async function estimateMargin(req: any): Promise<any> {
+  const res = await fetch(`${BASE}/risk/margin-estimate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req)
+  });
+  return _json<any>(res);
+}
+
+export async function getSlippageSensitivity(runId: string, slippageValues: number[]): Promise<any> {
+  const p = new URLSearchParams({ run_id: runId });
+  slippageValues.forEach(v => p.append("slippage_values", String(v)));
+  const res = await fetch(`${BASE}/risk/slippage-sensitivity?${p.toString()}`, {
+    method: "POST"
+  });
+  return _json<any>(res);
+}
+
+export async function triggerKillSwitch(scope = "ALL", reason = "Manual emergency stop"): Promise<any> {
+  const res = await fetch(`${BASE}/risk/kill-switch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scope, reason })
+  });
+  return _json<any>(res);
+}
+

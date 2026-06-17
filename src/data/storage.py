@@ -81,10 +81,16 @@ def init_db(con: duckdb.DuckDBPyConnection | None = None) -> None:
             underlying   VARCHAR    NOT NULL,
             expiry       DATE       NOT NULL,
             created_at   TIMESTAMP  NOT NULL,
-            legs         VARCHAR    NOT NULL
+            legs         VARCHAR    NOT NULL,
+            config       VARCHAR
         );
         """
     )
+    try:
+        con.execute("ALTER TABLE saved_strategies ADD COLUMN config VARCHAR")
+    except Exception:
+        pass
+
     con.execute(
         """
         CREATE TABLE IF NOT EXISTS fii_dii_daily (
@@ -99,6 +105,61 @@ def init_db(con: duckdb.DuckDBPyConnection | None = None) -> None:
         );
         """
     )
+    con.execute(
+        """
+        CREATE TABLE IF NOT EXISTS backtest_runs (
+            run_id       VARCHAR    NOT NULL,
+            strategy_id  VARCHAR,
+            request_json VARCHAR    NOT NULL,
+            stats_json   VARCHAR,
+            status       VARCHAR,
+            created_at   TIMESTAMP  NOT NULL
+        );
+        """
+    )
+    con.execute(
+        """
+        CREATE TABLE IF NOT EXISTS risk_reviews (
+            review_id     VARCHAR    NOT NULL,
+            entity_type   VARCHAR,
+            entity_id     VARCHAR,
+            risk_score    INTEGER,
+            risk_level    VARCHAR,
+            warnings_json VARCHAR,
+            created_at    TIMESTAMP  NOT NULL
+        );
+        """
+    )
+    con.execute(
+        """
+        CREATE TABLE IF NOT EXISTS audit_events (
+            event_id     VARCHAR    NOT NULL,
+            user_id      VARCHAR,
+            event_type   VARCHAR,
+            entity_type  VARCHAR,
+            entity_id    VARCHAR,
+            payload_json VARCHAR,
+            created_at   TIMESTAMP  NOT NULL
+        );
+        """
+    )
+    con.execute(
+        """
+        CREATE TABLE IF NOT EXISTS kill_switch (
+            id           INTEGER    NOT NULL DEFAULT 1,
+            active       BOOLEAN    NOT NULL DEFAULT FALSE,
+            reason       VARCHAR,
+            activated_at TIMESTAMP
+        );
+        """
+    )
+    # Ensure kill_switch has exactly one row
+    try:
+        row = con.execute("SELECT COUNT(*) FROM kill_switch").fetchone()
+        if row and row[0] == 0:
+            con.execute("INSERT INTO kill_switch (id, active) VALUES (1, FALSE)")
+    except Exception:
+        pass
 
 
 _INDEXED = False
@@ -329,3 +390,163 @@ def verify(fast: bool = False) -> dict:
         return out
     finally:
         cur.close()
+
+
+def log_audit_event(
+    event_type: str,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+    payload: dict | None = None,
+    user_id: str | None = "user"
+) -> str:
+    import json
+    import uuid
+    con = db()
+    event_id = str(uuid.uuid4())
+    payload_json = json.dumps(payload or {})
+    con.execute(
+        "INSERT INTO audit_events (event_id, user_id, event_type, entity_type, entity_id, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [event_id, user_id, event_type, entity_type, entity_id, payload_json, datetime.now()]
+    )
+    return event_id
+
+
+def save_backtest_run(
+    run_id: str,
+    strategy_id: str | None,
+    request_json: str,
+    stats_json: str | None,
+    status: str
+) -> None:
+    con = db()
+    con.execute(
+        "INSERT INTO backtest_runs (run_id, strategy_id, request_json, stats_json, status, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        [run_id, strategy_id, request_json, stats_json, status, datetime.now()]
+    )
+
+
+def list_backtest_runs() -> list[dict]:
+    import json
+    con = db()
+    cur = con.cursor()
+    try:
+        rows = cur.execute(
+            "SELECT run_id, strategy_id, request_json, stats_json, status, created_at FROM backtest_runs ORDER BY created_at DESC"
+        ).fetchall()
+        out = []
+        for run_id, strategy_id, req_j, stats_j, status, created_at in rows:
+            out.append({
+                "run_id": run_id,
+                "strategy_id": strategy_id,
+                "request": json.loads(req_j) if req_j else {},
+                "stats": json.loads(stats_j) if stats_j else None,
+                "status": status,
+                "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else str(created_at)
+            })
+        return out
+    finally:
+        cur.close()
+
+
+def get_backtest_run(run_id: str) -> dict | None:
+    import json
+    con = db()
+    cur = con.cursor()
+    try:
+        row = cur.execute(
+            "SELECT run_id, strategy_id, request_json, stats_json, status, created_at FROM backtest_runs WHERE run_id = ?",
+            [run_id]
+        ).fetchone()
+        if not row:
+            return None
+        r_id, strategy_id, req_j, stats_j, status, created_at = row
+        return {
+            "run_id": r_id,
+            "strategy_id": strategy_id,
+            "request": json.loads(req_j) if req_j else {},
+            "stats": json.loads(stats_j) if stats_j else None,
+            "status": status,
+            "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else str(created_at)
+        }
+    finally:
+        cur.close()
+
+
+# ---- Risk management helpers ----
+
+def get_daily_pnl(day: date) -> float | None:
+    """Sum net PnL from all backtest runs completed today."""
+    import json
+    con = db()
+    cur = con.cursor()
+    try:
+        rows = cur.execute(
+            "SELECT stats_json FROM backtest_runs WHERE CAST(created_at AS DATE) = ? AND status = 'COMPLETED'",
+            [day]
+        ).fetchall()
+        if not rows:
+            return None
+        total = 0.0
+        for (stats_j,) in rows:
+            if stats_j:
+                stats = json.loads(stats_j)
+                total += stats.get("stats", {}).get("net_pnl", 0.0)
+        return total
+    finally:
+        cur.close()
+
+
+def get_daily_trade_count(day: date) -> int:
+    """Count backtest runs completed today."""
+    con = db()
+    cur = con.cursor()
+    try:
+        row = cur.execute(
+            "SELECT COUNT(*) FROM backtest_runs WHERE CAST(created_at AS DATE) = ?",
+            [day]
+        ).fetchone()
+        return row[0] if row else 0
+    finally:
+        cur.close()
+
+
+def get_last_trade_exit_time() -> datetime | None:
+    """Get the most recent backtest completion time."""
+    con = db()
+    cur = con.cursor()
+    try:
+        row = cur.execute(
+            "SELECT MAX(created_at) FROM backtest_runs WHERE status = 'COMPLETED'"
+        ).fetchone()
+        return row[0] if row and row[0] else None
+    finally:
+        cur.close()
+
+
+def is_kill_switch_active() -> bool:
+    """Check if the emergency kill switch is active."""
+    con = db()
+    cur = con.cursor()
+    try:
+        row = cur.execute("SELECT active FROM kill_switch WHERE id = 1").fetchone()
+        return bool(row[0]) if row else False
+    finally:
+        cur.close()
+
+
+def activate_kill_switch(reason: str = "Manual emergency stop") -> None:
+    """Activate the kill switch to halt all trading."""
+    con = db()
+    con.execute(
+        "UPDATE kill_switch SET active = TRUE, reason = ?, activated_at = ? WHERE id = 1",
+        [reason, datetime.now()]
+    )
+
+
+def deactivate_kill_switch() -> None:
+    """Deactivate the kill switch to resume trading."""
+    con = db()
+    con.execute(
+        "UPDATE kill_switch SET active = FALSE, reason = NULL, activated_at = NULL WHERE id = 1"
+    )
+

@@ -7,8 +7,19 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-
-from api.routes import backtest as bt, data as dt, options_chain as oc, payoff as pf, live_data as ld, flow as fl, oauth as oa, fii_dii as fd
+from .routes import (
+    backtest as bt,
+    data as dt,
+    options_chain as oc,
+    payoff as pf,
+    live_data as ld,
+    flow as fl,
+    oauth as oa,
+    fii_dii as fd,
+    market as mk,
+    strategies as st,
+    risk as rk,
+)
 
 app = FastAPI(title="Options Backtest Platform", version="1.0")
 app.add_middleware(
@@ -25,6 +36,9 @@ app.include_router(ld.router, prefix="/api")
 app.include_router(fl.router, prefix="/api")
 app.include_router(oa.router, prefix="/api")
 app.include_router(fd.router, prefix="/api")
+app.include_router(mk.router, prefix="/api")
+app.include_router(st.router, prefix="/api")
+app.include_router(rk.router, prefix="/api")
 
 dist = Path(__file__).parent.parent / "frontend" / "dist"
 if dist.exists():

@@ -143,6 +143,7 @@ class BacktestResponse(BaseModel):
     trades: list[TradeResult]
     equity_curve: list[float]
     skipped_days: int = 0
+    run_id: Optional[str] = None
 
 
 # ---- Parametric grid sweep (entry-time x stop-loss%) ----

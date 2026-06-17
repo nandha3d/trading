@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   getExpiries, getTradeDates, getOptionsChainData, getPayoffCurve,
-  getExpiriesForDate, saveStrategy, listStrategies, deleteStrategy
+  getExpiriesForDate, saveStrategy, listStrategies, deleteStrategy, getOiBuildup
 } from "../api";
 import type { OptionsChainResponse, PayoffResponse, SavedStrategy, PayoffLegSpec } from "../types";
 import {
@@ -82,6 +82,28 @@ function localDateStr(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+function getBuildupClass(classification: string): string {
+  switch (classification) {
+    case "LONG_BUILDUP":
+      return "bg-green-950/80 text-green-400 border border-green-500/30";
+    case "SHORT_BUILDUP":
+      return "bg-red-950/80 text-red-400 border border-red-500/30";
+    case "SHORT_COVERING":
+      return "bg-blue-950/80 text-blue-400 border border-blue-500/30";
+    case "LONG_UNWINDING":
+      return "bg-amber-950/80 text-amber-400 border border-amber-500/30";
+    default:
+      return "bg-gray-800 text-gray-400 border border-gray-700/30";
+  }
+}
+
+function formatBuildupLabel(classification: string): string {
+  return classification
+    .replace("_", " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function computeLiveExpiries(underlying: string): string[] {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -146,6 +168,40 @@ export default function OptionsChain() {
   const [data, setData] = useState<OptionsChainResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [oiBuildup, setOiBuildup] = useState<any[]>([]);
+
+  // Fetch OI buildup classification
+  useEffect(() => {
+    const activeExpiry = isLive ? liveExpiry : selectedExpiry;
+    if (!activeExpiry) {
+      setOiBuildup([]);
+      return;
+    }
+    getOiBuildup(underlying, activeExpiry)
+      .then((res) => {
+        if (res && res.rows) {
+          setOiBuildup(res.rows);
+        } else {
+          setOiBuildup([]);
+        }
+      })
+      .catch((e) => {
+        console.error("Failed to load OI buildup:", e);
+      });
+  }, [underlying, selectedExpiry, liveExpiry, isLive]);
+
+  const buildupMap = useMemo(() => {
+    const map: Record<string, { classification: string; bias: string }> = {};
+    if (oiBuildup && Array.isArray(oiBuildup)) {
+      oiBuildup.forEach((row) => {
+        map[`${row.strike}_${row.option_type}`] = {
+          classification: row.classification,
+          bias: row.bias,
+        };
+      });
+    }
+    return map;
+  }, [oiBuildup]);
 
   // Debounced slider: triggers payoff recalc in historical mode after slider settles
   const [debouncedSlider, setDebouncedSlider] = useState(sliderVal);
@@ -1083,6 +1139,11 @@ export default function OptionsChain() {
                         <th className="py-2.5 px-2 text-right border-r border-gray-800 text-purple-400">IV</th>
                         <th className="py-2.5 px-2 text-right border-r border-gray-800 text-orange-400 font-medium">Theta</th>
                         <th className="py-2.5 px-2 text-right border-r border-gray-800 text-blue-400 font-medium">Delta</th>
+                        <th className="py-2.5 px-2 text-right border-r border-gray-800 text-cyan-400 font-medium">Gamma</th>
+                        <th className="py-2.5 px-2 text-right border-r border-gray-800 text-teal-400 font-medium">Vega</th>
+                        <th className="py-2.5 px-2 text-right border-r border-gray-800 text-emerald-300 font-medium">Bid</th>
+                        <th className="py-2.5 px-2 text-right border-r border-gray-800 text-rose-300 font-medium">Ask</th>
+                        <th className="py-2.5 px-2 text-right border-r border-gray-800 text-slate-400 font-medium">Spread</th>
                       </>
                     )}
                     <th className="py-2.5 px-3 border-r border-gray-800 text-right">CE OI</th>
@@ -1100,6 +1161,11 @@ export default function OptionsChain() {
                       <>
                         <th className="py-2.5 px-2 text-left border-r border-gray-800 text-blue-400 font-medium">Delta</th>
                         <th className="py-2.5 px-2 text-left border-r border-gray-800 text-orange-400 font-medium">Theta</th>
+                        <th className="py-2.5 px-2 text-left border-r border-gray-800 text-cyan-400 font-medium">Gamma</th>
+                        <th className="py-2.5 px-2 text-left border-r border-gray-800 text-teal-400 font-medium">Vega</th>
+                        <th className="py-2.5 px-2 text-left border-r border-gray-800 text-emerald-300 font-medium">Bid</th>
+                        <th className="py-2.5 px-2 text-left border-r border-gray-800 text-rose-300 font-medium">Ask</th>
+                        <th className="py-2.5 px-2 text-left border-r border-gray-800 text-slate-400 font-medium">Spread</th>
                         <th className="py-2.5 px-2 text-purple-400">IV</th>
                       </>
                     )}
@@ -1134,12 +1200,40 @@ export default function OptionsChain() {
                               <td className={`py-2 px-2 text-right border-r border-gray-800 text-blue-400 font-mono text-[11px] ${isCeItm ? "bg-amber-500/[0.03]" : ""}`}>
                                 {row.ce?.delta != null ? row.ce.delta.toFixed(2) : "-"}
                               </td>
+                              <td className={`py-2 px-2 text-right border-r border-gray-800 text-cyan-400 font-mono text-[11px] ${isCeItm ? "bg-amber-500/[0.03]" : ""}`}>
+                                {(row.ce as any)?.gamma != null ? (row.ce as any).gamma.toFixed(4) : "-"}
+                              </td>
+                              <td className={`py-2 px-2 text-right border-r border-gray-800 text-teal-400 font-mono text-[11px] ${isCeItm ? "bg-amber-500/[0.03]" : ""}`}>
+                                {(row.ce as any)?.vega != null ? (row.ce as any).vega.toFixed(2) : "-"}
+                              </td>
+                              <td className={`py-2 px-2 text-right border-r border-gray-800 text-emerald-300 font-mono text-[11px] ${isCeItm ? "bg-amber-500/[0.03]" : ""}`}>
+                                {(row.ce as any)?.bid != null ? (row.ce as any).bid.toFixed(2) : "-"}
+                              </td>
+                              <td className={`py-2 px-2 text-right border-r border-gray-800 text-rose-300 font-mono text-[11px] ${isCeItm ? "bg-amber-500/[0.03]" : ""}`}>
+                                {(row.ce as any)?.ask != null ? (row.ce as any).ask.toFixed(2) : "-"}
+                              </td>
+                              <td className={`py-2 px-2 text-right border-r border-gray-800 text-slate-400 font-mono text-[11px] ${isCeItm ? "bg-amber-500/[0.03]" : ""}`}>
+                                {(row.ce as any)?.spread != null ? (row.ce as any).spread.toFixed(2) : "-"}
+                              </td>
                             </>
                           )}
 
                           {/* Call Columns */}
                           <td className={`py-2 px-3 text-right border-r border-gray-800 text-gray-400 font-mono ${isCeItm ? "bg-amber-500/[0.03] text-amber-500/80" : ""}`}>
-                            {fmtLargeNum(row.ce?.oi ?? null)}
+                            <div className="flex flex-col items-end">
+                              <span>{fmtLargeNum(row.ce?.oi ?? null)}</span>
+                              {(() => {
+                                const b = buildupMap[`${row.strike}_CE`];
+                                if (b && b.classification && b.classification !== "NEUTRAL") {
+                                  return (
+                                    <span className={`text-[9px] font-semibold px-1 py-0.2 rounded mt-0.5 whitespace-nowrap scale-90 origin-right ${getBuildupClass(b.classification)}`}>
+                                      {formatBuildupLabel(b.classification)}
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </div>
                           </td>
                           <td className={`py-2 px-3 text-right border-r border-gray-800 text-gray-500 font-mono ${isCeItm ? "bg-amber-500/[0.03]" : ""}`}>
                             {row.ce?.volume?.toLocaleString() ?? "-"}
@@ -1195,7 +1289,20 @@ export default function OptionsChain() {
                             {row.pe?.volume?.toLocaleString() ?? "-"}
                           </td>
                           <td className={`py-2 px-3 text-left border-r border-gray-800 text-gray-400 font-mono ${isPeItm ? "bg-amber-500/[0.03] text-amber-500/80" : ""}`}>
-                            {fmtLargeNum(row.pe?.oi ?? null)}
+                            <div className="flex flex-col items-start">
+                              <span>{fmtLargeNum(row.pe?.oi ?? null)}</span>
+                              {(() => {
+                                const b = buildupMap[`${row.strike}_PE`];
+                                if (b && b.classification && b.classification !== "NEUTRAL") {
+                                  return (
+                                    <span className={`text-[9px] font-semibold px-1 py-0.2 rounded mt-0.5 whitespace-nowrap scale-90 origin-left ${getBuildupClass(b.classification)}`}>
+                                      {formatBuildupLabel(b.classification)}
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
+                            </div>
                           </td>
 
                           {/* Put Greeks */}
@@ -1207,6 +1314,21 @@ export default function OptionsChain() {
                               <td className={`py-2 px-2 text-left border-r border-gray-800 text-orange-400 font-mono text-[11px] ${isPeItm ? "bg-amber-500/[0.03]" : ""}`}>
                                 {row.pe?.theta != null ? row.pe.theta.toFixed(2) : "-"}
                               </td>
+                              <td className={`py-2 px-2 text-left border-r border-gray-800 text-cyan-400 font-mono text-[11px] ${isPeItm ? "bg-amber-500/[0.03]" : ""}`}>
+                                {(row.pe as any)?.gamma != null ? (row.pe as any).gamma.toFixed(4) : "-"}
+                              </td>
+                              <td className={`py-2 px-2 text-left border-r border-gray-800 text-teal-400 font-mono text-[11px] ${isPeItm ? "bg-amber-500/[0.03]" : ""}`}>
+                                {(row.pe as any)?.vega != null ? (row.pe as any).vega.toFixed(2) : "-"}
+                              </td>
+                              <td className={`py-2 px-2 text-left border-r border-gray-800 text-emerald-300 font-mono text-[11px] ${isPeItm ? "bg-amber-500/[0.03]" : ""}`}>
+                                {(row.pe as any)?.bid != null ? (row.pe as any).bid.toFixed(2) : "-"}
+                              </td>
+                              <td className={`py-2 px-2 text-left border-r border-gray-800 text-rose-300 font-mono text-[11px] ${isPeItm ? "bg-amber-500/[0.03]" : ""}`}>
+                                {(row.pe as any)?.ask != null ? (row.pe as any).ask.toFixed(2) : "-"}
+                              </td>
+                              <td className={`py-2 px-2 text-left border-r border-gray-800 text-slate-400 font-mono text-[11px] ${isPeItm ? "bg-amber-500/[0.03]" : ""}`}>
+                                {(row.pe as any)?.spread != null ? (row.pe as any).spread.toFixed(2) : "-"}
+                              </td>
                               <td className={`py-2 px-2 text-left text-purple-400 font-mono text-[11px] ${isPeItm ? "bg-amber-500/[0.03]" : ""}`}>
                                 {row.pe?.iv != null ? `${row.pe.iv.toFixed(1)}%` : "-"}
                               </td>
@@ -1216,11 +1338,11 @@ export default function OptionsChain() {
 
                         {renderSpotLine && (
                           <tr className="bg-green-500/10 border-y border-green-500/20">
-                            <td colSpan={showGreeks ? 7 : 4} className="py-1 px-3 border-r border-gray-800" />
+                            <td colSpan={showGreeks ? 8 : 4} className="py-1 px-3 border-r border-gray-800" />
                             <td className="py-1 text-center bg-green-500 text-gray-950 font-extrabold text-[10px] tracking-wider uppercase rounded-sm shadow-md">
                               Spot: {fmtPrice(spotPrice)}
                             </td>
-                            <td colSpan={showGreeks ? 7 : 4} className="py-1 px-3" />
+                            <td colSpan={showGreeks ? 8 : 4} className="py-1 px-3" />
                           </tr>
                         )}
                       </React.Fragment>
