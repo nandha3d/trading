@@ -15,12 +15,12 @@ OPTIONS_SCHEMA = pa.schema(
         ("strike", pa.int32()),          # strike price
         ("option_type", pa.string()),    # "CE" | "PE"
         ("ts", pa.timestamp("s")),       # candle open time, IST, 1-min
-        ("open", pa.float64()),
-        ("high", pa.float64()),
-        ("low", pa.float64()),
-        ("close", pa.float64()),
-        ("volume", pa.int64()),
-        ("oi", pa.int64()),              # open interest (0 if source lacks it)
+        ("open", pa.float32()),
+        ("high", pa.float32()),
+        ("low", pa.float32()),
+        ("close", pa.float32()),
+        ("volume", pa.int32()),
+        ("oi", pa.int32()),              # open interest (0 if source lacks it)
     ]
 )
 
@@ -29,11 +29,11 @@ SPOT_SCHEMA = pa.schema(
     [
         ("underlying", pa.string()),
         ("ts", pa.timestamp("s")),
-        ("open", pa.float64()),
-        ("high", pa.float64()),
-        ("low", pa.float64()),
-        ("close", pa.float64()),
-        ("volume", pa.int64()),
+        ("open", pa.float32()),
+        ("high", pa.float32()),
+        ("low", pa.float32()),
+        ("close", pa.float32()),
+        ("volume", pa.int32()),
     ]
 )
 

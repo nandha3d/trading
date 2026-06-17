@@ -51,12 +51,12 @@ def init_db(con: duckdb.DuckDBPyConnection | None = None) -> None:
             strike       INTEGER    NOT NULL,
             option_type  VARCHAR    NOT NULL,
             ts           TIMESTAMP  NOT NULL,
-            open         DOUBLE,
-            high         DOUBLE,
-            low          DOUBLE,
-            close        DOUBLE,
-            volume       BIGINT,
-            oi           BIGINT
+            open         FLOAT,
+            high         FLOAT,
+            low          FLOAT,
+            close        FLOAT,
+            volume       INTEGER,
+            oi           INTEGER
         );
         """
     )
@@ -65,11 +65,11 @@ def init_db(con: duckdb.DuckDBPyConnection | None = None) -> None:
         CREATE TABLE IF NOT EXISTS spot_1m (
             underlying VARCHAR   NOT NULL,
             ts         TIMESTAMP NOT NULL,
-            open       DOUBLE,
-            high       DOUBLE,
-            low        DOUBLE,
-            close      DOUBLE,
-            volume     BIGINT
+            open       FLOAT,
+            high       FLOAT,
+            low        FLOAT,
+            close      FLOAT,
+            volume     INTEGER
         );
         """
     )
