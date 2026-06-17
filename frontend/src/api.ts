@@ -69,6 +69,12 @@ export async function getTradeDates(underlying: string, expiry: string): Promise
   return data.dates;
 }
 
+export async function getOptionsChainLatestDate(underlying: string): Promise<string | null> {
+  const res = await fetch(`${BASE}/options-chain/latest-date?underlying=${underlying}`);
+  const data = await _json<{ date: string | null }>(res);
+  return data.date;
+}
+
 export async function getExpiriesForDate(underlying: string, date: string): Promise<string[]> {
   const p = new URLSearchParams({ underlying, date });
   const res = await fetch(`${BASE}/options-chain/expiries-for-date?${p}`);
@@ -201,6 +207,32 @@ export async function getOiTools(
   });
   const res = await fetch(`${BASE}/oi-tools?${p.toString()}`);
   return _json<OiToolsResponse>(res);
+}
+
+export async function getOiToolsLive(underlying: string, expiry: string): Promise<OiToolsResponse> {
+  const p = new URLSearchParams({ underlying, expiry });
+  const res = await fetch(`${BASE}/oi-tools/live?${p.toString()}`);
+  return _json<OiToolsResponse>(res);
+}
+
+export async function getLiveExpiries(underlying: string): Promise<string[]> {
+  const res = await fetch(`${BASE}/oi-analysis/live-expiries?underlying=${underlying}`);
+  const data = await _json<{ expiries: string[] }>(res);
+  return data.expiries;
+}
+
+export async function getLiveStrikes(underlying: string, expiry: string): Promise<{ strikes: number[]; spot: number }> {
+  const p = new URLSearchParams({ underlying, expiry });
+  const res = await fetch(`${BASE}/oi-analysis/live-strikes?${p.toString()}`);
+  return _json<{ strikes: number[]; spot: number }>(res);
+}
+
+export async function getOiAnalysisLive(
+  underlying: string, expiry: string, strike: number
+): Promise<OiAnalysisResponse> {
+  const p = new URLSearchParams({ underlying, expiry, strike: String(strike) });
+  const res = await fetch(`${BASE}/oi-analysis/live?${p.toString()}`);
+  return _json<OiAnalysisResponse>(res);
 }
 
 export interface FiiDiiParticipant {

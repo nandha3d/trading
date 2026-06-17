@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   getExpiries, getTradeDates, getOptionsChainData, getPayoffCurve,
-  getExpiriesForDate, saveStrategy, listStrategies, deleteStrategy, getOiBuildup
+  getExpiriesForDate, getOptionsChainLatestDate, saveStrategy, listStrategies, deleteStrategy, getOiBuildup
 } from "../api";
 import type { OptionsChainResponse, PayoffResponse, SavedStrategy, PayoffLegSpec } from "../types";
 import {
@@ -148,9 +148,15 @@ export default function OptionsChain() {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [sliderVal, setSliderVal] = useState<number>(560); // Default to 09:20 AM (560m)
   
-  // Live Feed toggle — default true; persisted across page loads
+  // After 15:30 market is closed — no live needed
+  const isMarketClosed = (): boolean => {
+    const now = new Date();
+    return now.getHours() * 60 + now.getMinutes() >= 15 * 60 + 30;
+  };
+
+  // Live Feed toggle — force historical after market close
   const [isLive, setIsLive] = useState(
-    () => localStorage.getItem("oc_isLive") !== "false"
+    () => !isMarketClosed() && localStorage.getItem("oc_isLive") !== "false"
   );
   const [liveExpiry, setLiveExpiry] = useState<string>(() => computeLiveExpiries(
     (localStorage.getItem("oc_underlying") as "NIFTY" | "BANKNIFTY") ?? "NIFTY"
@@ -282,32 +288,58 @@ export default function OptionsChain() {
     handleDateChange(localDateStr(d));
   };
 
-  // 1. Fetch expiries on mount or underlying change
+  // 1. On mount or underlying change: date-first init.
+  //    Find the latest date with any data → auto-pick expiry → load trade dates.
+  //    Also load full expiry list for the dropdown.
   useEffect(() => {
+    // Load all expiries for dropdown
     getExpiries(underlying)
-      .then((exps) => {
-        setExpiries(exps);
-        if (exps.length > 0) {
-          setSelectedExpiry(exps[0]);
-        } else {
-          setSelectedExpiry("");
-          setTradeDates([]);
-          setSelectedDate("");
-        }
+      .then((exps) => setExpiries(exps))
+      .catch(() => {});
+
+    // Find latest date with any options data
+    getOptionsChainLatestDate(underlying)
+      .then((latestDate) => {
+        // If after market close and today has data, use today; else use latestDate
+        const now = new Date();
+        const todayStr = localDateStr(now);
+        const targetDate = latestDate ?? todayStr;
+        setSelectedDate(targetDate);
+
+        // Auto-pick nearest expiry for that date
+        return getExpiriesForDate(underlying, targetDate).then((exps) => {
+          if (exps.length > 0) {
+            setSelectedExpiry(exps[0]);
+            // Load trade dates for display in nav (all dates for this expiry)
+            return getTradeDates(underlying, exps[0]).then(setTradeDates);
+          }
+          // No data for latest date: fallback to expiry dropdown
+          return getExpiries(underlying).then((allExps) => {
+            if (allExps.length > 0) {
+              setSelectedExpiry(allExps[0]);
+              return getTradeDates(underlying, allExps[0]).then((dates) => {
+                setTradeDates(dates);
+                if (dates.length > 0) setSelectedDate(dates[0]);
+              });
+            }
+          });
+        });
       })
-      .catch((e) => setError(`Failed to load expiries: ${e.message}`));
+      .catch((e) => setError(`Failed to init chain: ${e.message}`));
   }, [underlying]);
 
-  // 2. Fetch trade dates when expiry changes
+  // 2. When expiry changes manually (user picks from dropdown), reload trade dates
+  //    but don't reset selectedDate — keep current date if valid.
+  const prevExpiry = useRef<string>("");
   useEffect(() => {
-    if (!selectedExpiry) return;
+    if (!selectedExpiry || selectedExpiry === prevExpiry.current) return;
+    prevExpiry.current = selectedExpiry;
     getTradeDates(underlying, selectedExpiry)
       .then((dates) => {
         setTradeDates(dates);
-        if (dates.length > 0) {
+        // Only reset date if current selectedDate has no data for new expiry
+        if (dates.length > 0 && !dates.includes(selectedDate)) {
           setSelectedDate(dates[0]);
-        } else {
-          setSelectedDate("");
         }
       })
       .catch((e) => setError(`Failed to load trade dates: ${e.message}`));
@@ -819,33 +851,38 @@ export default function OptionsChain() {
               </div>
             )}
 
-            {/* Live Today Toggle */}
+            {/* Live Today Toggle — disabled after market close */}
             <button
               onClick={() => {
+                // After 15:30 market is closed: switch to historical with latest data
+                if (!isLive && isMarketClosed()) {
+                  setIsLive(false);
+                  localStorage.setItem("oc_isLive", "false");
+                  getOptionsChainLatestDate(underlying).then((d) => {
+                    if (d) handleDateChange(d);
+                  });
+                  return;
+                }
                 const next = !isLive;
                 setIsLive(next);
                 localStorage.setItem("oc_isLive", String(next));
                 setLegs([]);
                 if (!next) {
-                  // Default to most recent available date (first in tradeDates, or yesterday)
-                  const latest = tradeDates[0] ?? (() => {
-                    const y = new Date();
-                    if (y.getDay() === 1) y.setDate(y.getDate() - 3); // Monday → Friday
-                    else y.setDate(y.getDate() - 1);
-                    return localDateStr(y);
-                  })();
+                  const latest = tradeDates[0] ?? localDateStr(new Date());
                   handleDateChange(latest);
                 }
               }}
-              title="Stream today's live market session (real broker feed during market hours)"
+              title={isMarketClosed() ? "Market closed — showing last available data" : "Stream today's live market session"}
               className={`px-4 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-2 border transition-all ${
                 isLive
                   ? "bg-green-600/20 border-green-500/40 text-green-300 shadow-md shadow-green-950/40"
+                  : isMarketClosed()
+                  ? "bg-gray-600/10 border-gray-500/20 text-gray-500 cursor-default"
                   : "bg-red-600/10 border-red-500/20 text-red-400 hover:bg-red-600/20"
               }`}
             >
-              <span className={`w-1.5 h-1.5 rounded-full inline-block ${isLive ? "bg-green-400 animate-ping" : "bg-red-500"}`} />
-              {isLive ? "LIVE ACTIVE" : "LIVE TODAY"}
+              <span className={`w-1.5 h-1.5 rounded-full inline-block ${isLive ? "bg-green-400 animate-ping" : isMarketClosed() ? "bg-gray-600" : "bg-red-500"}`} />
+              {isLive ? "LIVE ACTIVE" : isMarketClosed() ? "MARKET CLOSED" : "LIVE TODAY"}
             </button>
 
             {/* Live source / status badge */}

@@ -135,6 +135,73 @@ def _trading_dates(underlying: str) -> list[str]:
         cur.close()
 
 
+@router.get("/oi-tools/live")
+async def get_oi_tools_live(
+    underlying: str = Query(...),
+    expiry: str = Query(""),
+):
+    """Live OI tools (stats/spurt/bigmove/trending/active) from Angel feed."""
+    try:
+        from src.data.angelone_feed import get_feed
+        from src.data import angelone_scrip as scrip
+
+        exp = expiry
+        if not exp:
+            exps = scrip.list_expiries(underlying)
+            today = _date.today().isoformat()
+            future = [e for e in exps if e >= today]
+            exp = future[0] if future else (exps[-1] if exps else "")
+        if not exp:
+            raise ValueError(f"No expiry available for {underlying}")
+        feed = get_feed(underlying, exp)
+        return await asyncio.to_thread(feed.get_oi_tools_payload)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/oi-analysis/live")
+async def get_oi_analysis_live(
+    underlying: str = Query(...),
+    expiry: str = Query(...),
+    strike: int = Query(...),
+):
+    """Single-row live OI analysis snapshot for one strike from Angel feed."""
+    try:
+        from src.data.angelone_feed import get_feed
+        feed = get_feed(underlying, expiry)
+        return await asyncio.to_thread(feed.get_oi_analysis_live, strike)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/oi-analysis/live-expiries")
+async def get_oi_live_expiries(underlying: str = Query(...)):
+    """Expiries from Angel scrip master for live mode (not DB)."""
+    try:
+        from src.data import angelone_scrip as scrip
+        exps = await asyncio.to_thread(scrip.list_expiries, underlying)
+        today = _date.today().isoformat()
+        future = [e for e in exps if e >= today]
+        return {"expiries": future[:8]}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/oi-analysis/live-strikes")
+async def get_oi_live_strikes(
+    underlying: str = Query(...),
+    expiry: str = Query(...),
+):
+    """Strikes from live Angel feed for the given expiry."""
+    try:
+        from src.data.angelone_feed import get_feed
+        feed = get_feed(underlying, expiry)
+        strikes = await asyncio.to_thread(feed.get_strikes)
+        return {"strikes": strikes, "spot": feed.spot_price}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.get("/flow/dates")
 async def get_flow_dates(underlying: str = Query(...)):
     try:

@@ -115,17 +115,33 @@ def _get_options_chain_data(underlying: str, expiry: str, ts: str):
         ).fetchone()
         spot_price: Optional[float] = spot_row[0] if spot_row else None
 
+        # Snap to nearest stored timestamp: latest at-or-before requested time,
+        # fallback to earliest on that day (handles EOD-only bhav data).
+        day_date = ts_val.date()
+        snap_row = con.execute(
+            """SELECT ts FROM options_1m
+               WHERE underlying = ? AND expiry = ? AND CAST(ts AS DATE) = ? AND ts <= ?
+               ORDER BY ts DESC LIMIT 1""",
+            [und, exp_date, day_date, ts_val],
+        ).fetchone()
+        if not snap_row:
+            snap_row = con.execute(
+                """SELECT ts FROM options_1m
+                   WHERE underlying = ? AND expiry = ? AND CAST(ts AS DATE) = ?
+                   ORDER BY ts LIMIT 1""",
+                [und, exp_date, day_date],
+            ).fetchone()
+        actual_ts = snap_row[0] if snap_row else ts_val
+
         options_rows = con.execute(
             """
             SELECT strike, option_type, close, volume, oi
             FROM options_1m
             WHERE underlying = ? AND expiry = ? AND ts = ?
             """,
-            [und, exp_date, ts_val],
+            [und, exp_date, actual_ts],
         ).fetchall()
 
-        # OI at day open (for oi_change)
-        day_date = ts_val.date()
         open_ts_row = con.execute(
             "SELECT MIN(ts) FROM options_1m WHERE underlying = ? AND expiry = ? AND CAST(ts AS DATE) = ?",
             [und, exp_date, day_date],
@@ -239,6 +255,27 @@ async def get_options_chain_data(underlying: str, expiry: str, ts: str):
     except Exception as e:
         raise HTTPException(500, f"Database error: {e}")
 
+
+
+@router.get("/options-chain/latest-date")
+async def latest_date(underlying: str):
+    """Return the most recent date that has any options data for this underlying."""
+    def _q():
+        storage.init_db()
+        con = storage.db().cursor()
+        try:
+            row = con.execute(
+                "SELECT MAX(CAST(ts AS DATE)) FROM options_1m WHERE underlying=?",
+                [underlying.upper()],
+            ).fetchone()
+            d = row[0] if row else None
+            return {"date": d.isoformat() if d else None}
+        finally:
+            con.close()
+    try:
+        return await asyncio.to_thread(_q)
+    except Exception as e:
+        raise HTTPException(500, str(e))
 
 
 @router.get("/options-chain/expiries-for-date")

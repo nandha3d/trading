@@ -439,6 +439,126 @@ class AngelOneFeed:
                 "stale": not live,
             }
 
+    def get_strikes(self) -> list[int]:
+        """Strikes currently tracked by this feed."""
+        with self._lock:
+            return sorted(self.chain.keys())
+
+    def get_oi_tools_payload(self, top: int = 12) -> dict:
+        """Live OI tools built from in-memory chain (no DB)."""
+        with self._lock:
+            strikes = sorted(self.chain.keys())
+            ce_oi: dict[int, int] = {}
+            pe_oi: dict[int, int] = {}
+            contracts = []
+            rows_by_strike = {}
+
+            for s in strikes:
+                c = self.chain[s]
+                ce, pe = c["ce_oi"], c["pe_oi"]
+                ce_open, pe_open = c["ce_oi_open"], c["pe_oi_open"]
+                ce_ltp, pe_ltp = c["ce_ltp"], c["pe_ltp"]
+                ce_ltp_open, pe_ltp_open = c["ce_ltp_open"], c["pe_ltp_open"]
+                ce_chg = (ce - ce_open) if ce_open else 0
+                pe_chg = (pe - pe_open) if pe_open else 0
+                ce_ltp_chg = round(ce_ltp - ce_ltp_open, 2) if ce_ltp_open else 0.0
+                pe_ltp_chg = round(pe_ltp - pe_ltp_open, 2) if pe_ltp_open else 0.0
+                ce_oi[s] = ce
+                pe_oi[s] = pe
+                contracts.append({
+                    "strike": s, "type": "CE",
+                    "oi": ce, "oi_chg_bucket": ce_chg, "oi_chg_day": ce_chg,
+                    "ltp": round(ce_ltp, 2), "ltp_chg": ce_ltp_chg,
+                    "interp": self._interpret(ce_chg, ce_ltp_chg),
+                })
+                contracts.append({
+                    "strike": s, "type": "PE",
+                    "oi": pe, "oi_chg_bucket": pe_chg, "oi_chg_day": pe_chg,
+                    "ltp": round(pe_ltp, 2), "ltp_chg": pe_ltp_chg,
+                    "interp": self._interpret(pe_chg, pe_ltp_chg),
+                })
+                rows_by_strike[s] = {
+                    "strike": s,
+                    "ce_oi": ce, "pe_oi": pe,
+                    "ce_oi_chg": ce_chg, "pe_oi_chg": pe_chg,
+                }
+
+            total_ce = sum(ce_oi.values())
+            total_pe = sum(pe_oi.values())
+            pcr = round(total_pe / total_ce, 3) if total_ce else None
+            max_pain_val = self._max_pain()
+            statistics = {
+                "total_ce_oi": total_ce, "total_pe_oi": total_pe,
+                "pcr": pcr, "max_pain": max_pain_val,
+                "rows": [rows_by_strike[s] for s in strikes],
+            }
+            spurt = sorted(contracts, key=lambda c: abs(c["oi_chg_bucket"]), reverse=True)[:top]
+            big = sorted(contracts, key=lambda c: abs(c["oi_chg_day"]), reverse=True)[:top]
+            active = sorted(
+                [{"strike": s, "ce_oi": ce_oi.get(s, 0), "pe_oi": pe_oi.get(s, 0),
+                  "total_oi": ce_oi.get(s, 0) + pe_oi.get(s, 0),
+                  "bias": "Put-heavy" if pe_oi.get(s, 0) > ce_oi.get(s, 0) else "Call-heavy"}
+                 for s in strikes],
+                key=lambda x: x["total_oi"], reverse=True)[:top]
+            ce_day_chg = sum(c["oi_chg_day"] for c in contracts if c["type"] == "CE")
+            pe_day_chg = sum(c["oi_chg_day"] for c in contracts if c["type"] == "PE")
+            score = pe_day_chg - ce_day_chg
+            denom = abs(pe_day_chg) + abs(ce_day_chg)
+            bull_pct = round(50 + 50 * score / denom, 1) if denom else 50.0
+            verdict = "Bullish" if bull_pct > 55 else "Bearish" if bull_pct < 45 else "Neutral"
+            trending = {
+                "ce_oi_chg": ce_day_chg, "pe_oi_chg": pe_day_chg,
+                "bull_pct": bull_pct, "bear_pct": round(100 - bull_pct, 1),
+                "verdict": verdict,
+            }
+            has_data = any(c["oi"] > 0 for c in contracts)
+
+        return {
+            "underlying": self.underlying,
+            "date": datetime.now().date().isoformat(),
+            "expiry": self.expiry,
+            "interval": 0,
+            "message": None if has_data else "No live OI data yet — feed connecting",
+            "statistics": statistics, "spurt": spurt, "big_movement": big,
+            "trending": trending, "active_strikes": active,
+            "stale": not has_data, "timestamp": datetime.now().isoformat(),
+        }
+
+    def get_oi_analysis_live(self, strike: int) -> dict:
+        """Current live snapshot for one strike — single-row OI analysis."""
+        with self._lock:
+            c = self.chain.get(strike, {})
+        ce_oi = c.get("ce_oi", 0)
+        pe_oi = c.get("pe_oi", 0)
+        ce_ltp = c.get("ce_ltp", 0.0)
+        pe_ltp = c.get("pe_ltp", 0.0)
+        ce_oi_open = c.get("ce_oi_open", 0)
+        pe_oi_open = c.get("pe_oi_open", 0)
+        ce_ltp_open = c.get("ce_ltp_open", 0.0)
+        pe_ltp_open = c.get("pe_ltp_open", 0.0)
+        ce_chg = (ce_oi - ce_oi_open) if ce_oi_open else 0
+        pe_chg = (pe_oi - pe_oi_open) if pe_oi_open else 0
+        ce_ltp_chg = round(ce_ltp - ce_ltp_open, 2) if ce_ltp_open else 0.0
+        pe_ltp_chg = round(pe_ltp - pe_ltp_open, 2) if pe_ltp_open else 0.0
+        now_str = datetime.now().strftime("%H:%M")
+        row = {
+            "time": f"{now_str} LIVE",
+            "call_oi": ce_oi, "call_oi_chg": ce_chg,
+            "call_break": None, "call_ltp": ce_ltp, "call_ltp_chg": ce_ltp_chg,
+            "call_interp": self._interpret(ce_chg, ce_ltp_chg),
+            "total_oi_chg": ce_chg + pe_chg,
+            "strike": strike,
+            "put_interp": self._interpret(pe_chg, pe_ltp_chg),
+            "put_ltp_chg": pe_ltp_chg, "put_ltp": pe_ltp,
+            "put_break": None, "put_oi_chg": pe_chg, "put_oi": pe_oi,
+        }
+        return {
+            "underlying": self.underlying, "expiry": self.expiry, "strike": strike,
+            "date": datetime.now().date().isoformat(), "interval": 0,
+            "message": None if (ce_oi or pe_oi) else "No live data for this strike yet",
+            "rows": [row] if (ce_oi or pe_oi) else [],
+        }
+
     def stop(self) -> None:
         try:
             if self._sws:

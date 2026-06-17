@@ -96,9 +96,16 @@ def _filter_options(rows: list[dict], start: date, end: date) -> list[dict]:
     for r in rows:
         # Upstox master columns may vary; try both known layouts
         name = (r.get("name") or "").strip().upper()
+        # Some Upstox master versions prefix name; strip index suffix
         if name not in ("NIFTY", "BANKNIFTY"):
-            continue
-        opt_type = (r.get("option_type") or "").strip().upper()
+            ts = (r.get("tradingsymbol") or "").strip().upper()
+            if ts.startswith("BANKNIFTY"):
+                name = "BANKNIFTY"
+            elif ts.startswith("NIFTY"):
+                name = "NIFTY"
+            else:
+                continue
+        opt_type = (r.get("option_type") or r.get("instrument_type") or "").strip().upper()
         if opt_type not in ("CE", "PE"):
             continue
         # expiry: "2026-06-26" or "26-06-2026" or similar
@@ -107,7 +114,7 @@ def _filter_options(rows: list[dict], start: date, end: date) -> list[dict]:
             exp = _parse_expiry(exp_raw)
         except ValueError:
             continue
-        if not (start <= exp <= end):
+        if exp < start:
             continue
         key = (r.get("instrument_key") or "").strip()
         if not key:
