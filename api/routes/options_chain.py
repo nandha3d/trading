@@ -233,6 +233,27 @@ async def get_options_chain_data(underlying: str, expiry: str, ts: str):
 
 
 
+@router.get("/options-chain/latest-date")
+async def latest_date(underlying: str):
+    """Return the most recent date that has any options data for this underlying."""
+    def _q():
+        storage.init_db()
+        con = storage.db().cursor()
+        try:
+            row = con.execute(
+                "SELECT MAX(CAST(ts AS DATE)) FROM options_1m WHERE underlying=?",
+                [underlying.upper()],
+            ).fetchone()
+            d = row[0] if row else None
+            return {"date": d.isoformat() if d else None}
+        finally:
+            con.close()
+    try:
+        return await asyncio.to_thread(_q)
+    except Exception as e:
+        raise HTTPException(500, str(e))
+
+
 @router.get("/options-chain/expiries-for-date")
 async def expiries_for_date(underlying: str, date: str):
     """Return expiries that have options data for the given date. Used for auto-expiry."""
