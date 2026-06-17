@@ -123,33 +123,41 @@ export default function FlowMatrix() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [underlying, mode]);
 
-  useEffect(() => {
-    if (!needsExpiry(sub) || !date) return;
-    getOiExpiries(underlying, date).then((e) => { setExpiries(e); setExpiry((p) => (e.includes(p) ? p : e[0] ?? "")); }).catch(() => setExpiries([]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sub, underlying, date]);
+  // For live mode non-dots tabs: use latest available DB date (today has no historical options data)
+  const effDate = (mode === "live" && sub !== "dots" && dates.length > 0) ? dates[0] : date;
 
   useEffect(() => {
-    if (sub !== "oi" || !date || !expiry) return;
-    getOiStrikes(underlying, date, expiry).then((s) => { setStrikes(s); setStrike((p) => (typeof p === "number" && s.includes(p) ? p : s[Math.floor(s.length / 2)] ?? "")); }).catch(() => setStrikes([]));
+    if (!needsExpiry(sub)) return;
+    const qDate = (mode === "live" && dates.length > 0) ? dates[0] : date;
+    if (!qDate) return;
+    getOiExpiries(underlying, qDate).then((e) => { setExpiries(e); setExpiry((p) => (e.includes(p) ? p : e[0] ?? "")); }).catch(() => setExpiries([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sub, underlying, date, expiry]);
+  }, [sub, underlying, date, mode, dates]);
+
+  useEffect(() => {
+    if (sub !== "oi" || !expiry) return;
+    const qDate = (mode === "live" && dates.length > 0) ? dates[0] : date;
+    if (!qDate) return;
+    getOiStrikes(underlying, qDate, expiry).then((s) => { setStrikes(s); setStrike((p) => (typeof p === "number" && s.includes(p) ? p : s[Math.floor(s.length / 2)] ?? "")); }).catch(() => setStrikes([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sub, underlying, date, mode, dates, expiry]);
 
   const go = useCallback(() => {
     if (sub === "risk" || sub === "fii") return;
-    if (!date) return;
+    const qDate = mode === "live" && sub !== "dots" && dates.length > 0 ? dates[0] : date;
+    if (!qDate) return;
     setLoading(true); setErr(null);
     const done = () => setLoading(false);
     const fail = (e: Error) => { setErr(e.message); setLoading(false); };
-    if (sub === "dots") getDots(underlying, date, interval, mode).then((d) => { setDots(d); done(); }).catch(fail);
+    if (sub === "dots") getDots(underlying, qDate, interval, mode).then((d) => { setDots(d); done(); }).catch(fail);
     else if (sub === "oi") {
       if (!expiry || strike === "") { done(); return; }
-      getOiAnalysis(underlying, date, expiry, Number(strike), interval, mode).then((d) => { setOi(d); done(); }).catch(fail);
+      getOiAnalysis(underlying, qDate, expiry, Number(strike), interval, mode).then((d) => { setOi(d); done(); }).catch(fail);
     } else {
       if (!expiry) { done(); return; }
-      getOiTools(underlying, date, expiry, interval).then((d) => { setTools(d); done(); }).catch(fail);
+      getOiTools(underlying, qDate, expiry, interval).then((d) => { setTools(d); done(); }).catch(fail);
     }
-  }, [sub, underlying, date, interval, mode, expiry, strike]);
+  }, [sub, underlying, date, dates, interval, mode, expiry, strike]);
 
   // In live mode, auto-run OI tool tabs when expiry (and strike for oi) are ready
   useEffect(() => {
@@ -195,7 +203,10 @@ export default function FlowMatrix() {
           {/* In live mode show today badge; historical shows date select */}
           {mode === "live" && sub !== "dots" && (
             <Field label="Date">
-              <div className="px-3 py-1.5 rounded-lg bg-emerald-900/30 border border-emerald-700/40 text-xs text-emerald-400 font-mono font-bold">{date} · TODAY</div>
+              <div className="px-3 py-1.5 rounded-lg bg-blue-900/30 border border-blue-700/40 text-xs text-blue-300 font-mono font-bold flex items-center gap-2">
+                {effDate || "—"}
+                <span className="text-[9px] bg-blue-800/50 px-1.5 py-0.5 rounded text-blue-400">LATEST DB</span>
+              </div>
             </Field>
           )}
           {mode === "historical" && (
@@ -654,6 +665,147 @@ function netFmt(long: number | null, short: number | null) {
   );
 }
 
+// Derive a simple market view from the most recent day's FII/DII data
+function deriveTrend(day: FiiDiiDay): {
+  verdict: string; score: number;
+  fiiFutNet: number | null; fiiOptNet: number | null; diiFutNet: number | null;
+  signals: string[];
+} {
+  const fii = day.participants.find(p => p.client_type === "FII");
+  const dii = day.participants.find(p => p.client_type === "DII");
+  const fiiFutNet = fii && fii.fut_idx_long != null && fii.fut_idx_short != null
+    ? fii.fut_idx_long - fii.fut_idx_short : null;
+  const fiiOptNet = fii
+    ? ((fii.opt_call_long ?? 0) + (fii.opt_put_long ?? 0)) - ((fii.opt_call_short ?? 0) + (fii.opt_put_short ?? 0))
+    : null;
+  const diiFutNet = dii && dii.fut_idx_long != null && dii.fut_idx_short != null
+    ? dii.fut_idx_long - dii.fut_idx_short : null;
+  // FII puts: more put SHORTS = bullish (selling protection); more put LONGS = bearish (hedging)
+  const fiiPutNet = fii && fii.opt_put_long != null && fii.opt_put_short != null
+    ? fii.opt_put_short - fii.opt_put_long : null; // positive = net put writer = bullish
+  const fiiCallNet = fii && fii.opt_call_long != null && fii.opt_call_short != null
+    ? fii.opt_call_short - fii.opt_call_long : null; // positive = net call writer = bearish
+
+  const signals: string[] = [];
+  let score = 0;
+  if (fiiFutNet != null) {
+    if (fiiFutNet > 0) { score += 2; signals.push(`FII buying futures (net +${fiiFutNet.toLocaleString("en-IN")}) → Bullish`); }
+    else { score -= 2; signals.push(`FII selling futures (net ${fiiFutNet.toLocaleString("en-IN")}) → Bearish`); }
+  }
+  if (fiiPutNet != null) {
+    if (fiiPutNet > 0) { score += 1; signals.push(`FII writing puts (+${fiiPutNet.toLocaleString("en-IN")} net) → Expects support / Bullish`); }
+    else if (fiiPutNet < 0) { score -= 1; signals.push(`FII buying puts (${fiiPutNet.toLocaleString("en-IN")} net) → Hedging downside / Bearish`); }
+  }
+  if (fiiCallNet != null) {
+    if (fiiCallNet > 0) { score -= 1; signals.push(`FII writing calls (+${fiiCallNet.toLocaleString("en-IN")} net) → Capping upside / Bearish`); }
+    else if (fiiCallNet < 0) { score += 1; signals.push(`FII buying calls (${fiiCallNet.toLocaleString("en-IN")} net) → Expects rally / Bullish`); }
+  }
+  if (diiFutNet != null) {
+    if (diiFutNet > 0) { score += 1; signals.push(`DII net long futures (+${diiFutNet.toLocaleString("en-IN")}) → Domestic buying`); }
+    else { score -= 1; signals.push(`DII net short futures (${diiFutNet.toLocaleString("en-IN")}) → Domestic selling`); }
+  }
+
+  let verdict = "Neutral";
+  if (score >= 3) verdict = "Strong Bullish";
+  else if (score >= 1) verdict = "Mildly Bullish";
+  else if (score <= -3) verdict = "Strong Bearish";
+  else if (score <= -1) verdict = "Mildly Bearish";
+
+  return { verdict, score, fiiFutNet, fiiOptNet, diiFutNet, signals };
+}
+
+function TrendCard({ day }: { day: FiiDiiDay }) {
+  const t = deriveTrend(day);
+  const isBull = t.verdict.includes("Bullish");
+  const isBear = t.verdict.includes("Bearish");
+  const verdictCls = isBull
+    ? "bg-emerald-950/40 border-emerald-700/50 text-emerald-300"
+    : isBear
+    ? "bg-red-950/40 border-red-700/50 text-red-300"
+    : "bg-gray-900 border-gray-700 text-gray-400";
+  const arrow = isBull ? "↑" : isBear ? "↓" : "→";
+
+  const kpiFmt = (n: number | null) => {
+    if (n == null) return "—";
+    const s = Math.abs(n) >= 1e5 ? (n / 1e5).toFixed(1) + "L" : n.toLocaleString("en-IN");
+    return (n > 0 ? "+" : "") + s;
+  };
+
+  return (
+    <div className="border border-gray-800 rounded-xl overflow-hidden">
+      <div className="bg-gray-900/60 px-4 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
+        Market View — as of {day.date}
+      </div>
+      <div className="p-4 space-y-4">
+        {/* Verdict + KPIs */}
+        <div className="flex flex-wrap gap-3 items-stretch">
+          <div className={`flex-1 min-w-[160px] rounded-xl border px-5 py-4 flex flex-col justify-center ${verdictCls}`}>
+            <div className="text-[10px] uppercase tracking-wider opacity-60 mb-1">Overall Verdict</div>
+            <div className="text-2xl font-extrabold">{t.verdict} {arrow}</div>
+            <div className="text-xs opacity-50 mt-1">Score: {t.score > 0 ? "+" : ""}{t.score} / 5</div>
+          </div>
+          <div className="grid grid-cols-3 gap-3 flex-1 min-w-[360px]">
+            <div className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-3">
+              <div className="text-[10px] text-blue-400 uppercase tracking-wider mb-1">FII Fut Net</div>
+              <div className={`text-lg font-extrabold font-mono ${(t.fiiFutNet ?? 0) > 0 ? "text-emerald-400" : (t.fiiFutNet ?? 0) < 0 ? "text-red-400" : "text-gray-500"}`}>
+                {kpiFmt(t.fiiFutNet)}
+              </div>
+              <div className="text-[9px] text-gray-600 mt-0.5">{(t.fiiFutNet ?? 0) > 0 ? "Net long" : "Net short"}</div>
+            </div>
+            <div className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-3">
+              <div className="text-[10px] text-blue-400 uppercase tracking-wider mb-1">FII Opt Net</div>
+              <div className={`text-lg font-extrabold font-mono ${(t.fiiOptNet ?? 0) > 0 ? "text-emerald-400" : (t.fiiOptNet ?? 0) < 0 ? "text-red-400" : "text-gray-500"}`}>
+                {kpiFmt(t.fiiOptNet)}
+              </div>
+              <div className="text-[9px] text-gray-600 mt-0.5">{(t.fiiOptNet ?? 0) > 0 ? "Net buyer" : "Net writer"}</div>
+            </div>
+            <div className="bg-gray-950 border border-gray-800 rounded-xl px-3 py-3">
+              <div className="text-[10px] text-emerald-400 uppercase tracking-wider mb-1">DII Fut Net</div>
+              <div className={`text-lg font-extrabold font-mono ${(t.diiFutNet ?? 0) > 0 ? "text-emerald-400" : (t.diiFutNet ?? 0) < 0 ? "text-red-400" : "text-gray-500"}`}>
+                {kpiFmt(t.diiFutNet)}
+              </div>
+              <div className="text-[9px] text-gray-600 mt-0.5">{(t.diiFutNet ?? 0) > 0 ? "Net long" : "Net short"}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Score bar */}
+        <div>
+          <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Bull / Bear Score</div>
+          <div className="h-3 rounded-full bg-gray-800 overflow-hidden relative">
+            <div className="absolute inset-y-0 left-1/2 w-px bg-gray-600 z-10" />
+            {t.score > 0 ? (
+              <div className="absolute inset-y-0 left-1/2 bg-emerald-600 rounded-r-full"
+                style={{ width: `${Math.min((t.score / 5) * 50, 50)}%` }} />
+            ) : (
+              <div className="absolute inset-y-0 right-1/2 bg-red-600 rounded-l-full"
+                style={{ width: `${Math.min((Math.abs(t.score) / 5) * 50, 50)}%` }} />
+            )}
+          </div>
+          <div className="flex justify-between text-[9px] text-gray-600 mt-0.5">
+            <span>Bearish</span><span>Neutral</span><span>Bullish</span>
+          </div>
+        </div>
+
+        {/* Signals */}
+        <div className="space-y-1.5">
+          <div className="text-[10px] text-gray-500 uppercase tracking-wider">Key Signals</div>
+          {t.signals.map((s, i) => {
+            const bull = s.includes("Bullish") || s.includes("Bullish") || s.includes("buying") || s.includes("support");
+            const bear = s.includes("Bearish") || s.includes("selling") || s.includes("Capping") || s.includes("Hedging");
+            return (
+              <div key={i} className={`flex items-start gap-2 text-xs px-3 py-1.5 rounded-lg border ${bull ? "bg-emerald-950/20 border-emerald-800/30 text-emerald-300" : bear ? "bg-red-950/20 border-red-800/30 text-red-300" : "bg-gray-900 border-gray-800 text-gray-400"}`}>
+                <span className="mt-0.5 flex-shrink-0">{bull ? "▲" : bear ? "▼" : "→"}</span>
+                <span>{s}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FiiDiiView() {
   const [data, setData] = useState<FiiDiiDay[]>([]);
   const [loading, setLoading] = useState(true);
@@ -702,6 +854,9 @@ function FiiDiiView() {
           ))}
         </div>
       </div>
+
+      {/* Trend analysis for latest day */}
+      {data.length > 0 && <TrendCard day={data[0]} />}
 
       {data.map(day => {
         const sorted = [...day.participants].sort(

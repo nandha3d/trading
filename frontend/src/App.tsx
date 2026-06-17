@@ -3,13 +3,12 @@ import StrategyBuilder from "./components/StrategyBuilder";
 import ResultsPanel from "./components/ResultsPanel";
 import OptionsChain from "./components/OptionsChain";
 import FlowMatrix from "./components/FlowMatrix";
-import Dashboard from "./components/Dashboard";
 import BacktestLoader from "./components/BacktestLoader";
 import GridSweep from "./components/GridSweep";
 import { getStatus } from "./api";
 import type { BacktestResponse, DbStatus } from "./types";
 
-type Tab = "oi-matrix" | "dashboard" | "backtest" | "sweep" | "chain";
+type Tab = "oi-matrix" | "backtest" | "sweep" | "chain";
 
 function fmtM(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -19,7 +18,6 @@ function fmtM(n: number) {
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "oi-matrix", label: "OI Matrix" },
-  { id: "dashboard", label: "Dashboard" },
   { id: "backtest", label: "Backtest" },
   { id: "sweep", label: "Auto Sweep" },
   { id: "chain", label: "Options Chain" },
@@ -85,9 +83,6 @@ export default function App() {
       {/* All tabs stay mounted — only visibility toggles. State (legs, payoff, WS) survives navigation. */}
       <div className={`flex-1 overflow-y-auto p-6 bg-gray-950 ${tab !== "oi-matrix" ? "hidden" : ""}`}>
         <FlowMatrix />
-      </div>
-      <div className={`flex-1 overflow-y-auto p-6 bg-gray-950 ${tab !== "dashboard" ? "hidden" : ""}`}>
-        <Dashboard />
       </div>
 
       <div className={`flex flex-1 overflow-hidden ${tab !== "backtest" ? "hidden" : ""}`}>
