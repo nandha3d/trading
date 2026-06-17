@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+﻿import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   getExpiries, getTradeDates, getOptionsChainData, getPayoffCurve,
   getExpiriesForDate, getOptionsChainLatestDate, saveStrategy, listStrategies, deleteStrategy, getOiBuildup
@@ -22,7 +22,7 @@ interface BuilderLeg extends PayoffLegSpec {
   tp_pct?: number;        // % of entry premium for take-profit trigger
 }
 
-// Current (post-1-Jan-2026 NSE revision) lot sizes — fallback only; the live
+// Current (post-1-Jan-2026 NSE revision) lot sizes â€” fallback only; the live
 // chain payload carries the broker's authoritative lot_size when available.
 const LOT_SIZES: Record<string, number> = { NIFTY: 65, BANKNIFTY: 30, FINNIFTY: 60, MIDCPNIFTY: 120 };
 
@@ -148,13 +148,13 @@ export default function OptionsChain() {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [sliderVal, setSliderVal] = useState<number>(560); // Default to 09:20 AM (560m)
   
-  // After 15:30 market is closed — no live needed
+  // After 15:30 market is closed â€” no live needed
   const isMarketClosed = (): boolean => {
     const now = new Date();
     return now.getHours() * 60 + now.getMinutes() >= 15 * 60 + 30;
   };
 
-  // Live Feed toggle — force historical after market close
+  // Live Feed toggle â€” force historical after market close
   const [isLive, setIsLive] = useState(
     () => !isMarketClosed() && localStorage.getItem("oc_isLive") !== "false"
   );
@@ -242,14 +242,14 @@ export default function OptionsChain() {
     loadSaved();
   }, []);
 
-  // Debounce slider → triggers payoff recalc 500 ms after slider stops moving
+  // Debounce slider â†’ triggers payoff recalc 500 ms after slider stops moving
   useEffect(() => {
     if (isLive) return;
     const t = setTimeout(() => setDebouncedSlider(sliderVal), 500);
     return () => clearTimeout(t);
   }, [sliderVal, isLive]);
 
-  // Change date → auto-pick nearest valid expiry for that date from DB
+  // Change date â†’ auto-pick nearest valid expiry for that date from DB
   const handleDateChange = (newDate: string) => {
     setSelectedDate(newDate);
     // Ask backend which expiries have data for this date
@@ -289,7 +289,7 @@ export default function OptionsChain() {
   };
 
   // 1. On mount or underlying change: date-first init.
-  //    Find the latest date with any data → auto-pick expiry → load trade dates.
+  //    Find the latest date with any data â†’ auto-pick expiry â†’ load trade dates.
   //    Also load full expiry list for the dropdown.
   useEffect(() => {
     // Load all expiries for dropdown
@@ -329,7 +329,7 @@ export default function OptionsChain() {
   }, [underlying]);
 
   // 2. When expiry changes manually (user picks from dropdown), reload trade dates
-  //    but don't reset selectedDate — keep current date if valid.
+  //    but don't reset selectedDate â€” keep current date if valid.
   const prevExpiry = useRef<string>("");
   useEffect(() => {
     if (!selectedExpiry || selectedExpiry === prevExpiry.current) return;
@@ -392,7 +392,7 @@ export default function OptionsChain() {
       } catch { /* ignore parse errors */ }
     };
 
-    ws.onerror = () => setError("Live feed connection error — retrying on next change.");
+    ws.onerror = () => setError("Live feed connection error â€” retrying on next change.");
     ws.onclose = () => {
       if (isLive) setTimeout(() => setWsReconnect(n => n + 1), 3000);
     };
@@ -414,7 +414,7 @@ export default function OptionsChain() {
     }).strike;
   }, [spotPrice, data]);
 
-  // σ bands for payoff chart
+  // Ïƒ bands for payoff chart
   const daysToExpiry = useMemo(() => {
     const exp = isLive ? liveExpiry : selectedExpiry;
     if (!exp) return 30;
@@ -714,25 +714,25 @@ export default function OptionsChain() {
     // PCR signal
     let pcrSignal: "BULLISH" | "BEARISH" | "NEUTRAL";
     let pcrNote: string;
-    if (pcr > 1.3)       { pcrSignal = "BULLISH"; pcrNote = `PCR ${pcr.toFixed(2)} — heavy put writing, bulls in control`; }
-    else if (pcr > 1.0)  { pcrSignal = "NEUTRAL";  pcrNote = `PCR ${pcr.toFixed(2)} — mild put dominance, slight bullish bias`; }
-    else if (pcr > 0.8)  { pcrSignal = "NEUTRAL";  pcrNote = `PCR ${pcr.toFixed(2)} — balanced OI, range-bound likely`; }
-    else                 { pcrSignal = "BEARISH"; pcrNote = `PCR ${pcr.toFixed(2)} — call writing dominates, bears in control`; }
+    if (pcr > 1.3)       { pcrSignal = "BULLISH"; pcrNote = `PCR ${pcr.toFixed(2)} â€” heavy put writing, bulls in control`; }
+    else if (pcr > 1.0)  { pcrSignal = "NEUTRAL";  pcrNote = `PCR ${pcr.toFixed(2)} â€” mild put dominance, slight bullish bias`; }
+    else if (pcr > 0.8)  { pcrSignal = "NEUTRAL";  pcrNote = `PCR ${pcr.toFixed(2)} â€” balanced OI, range-bound likely`; }
+    else                 { pcrSignal = "BEARISH"; pcrNote = `PCR ${pcr.toFixed(2)} â€” call writing dominates, bears in control`; }
 
     // Max Pain vs Spot
     const painPct = ((spotPrice - max_pain) / max_pain) * 100;
     let painSignal: "BULLISH" | "BEARISH" | "NEUTRAL";
     let painNote: string;
-    if (painPct > 1.5)       { painSignal = "BEARISH"; painNote = `Spot ${painPct.toFixed(1)}% above Max Pain ${max_pain.toLocaleString("en-IN")} — gravity pull DOWN`; }
-    else if (painPct < -1.5) { painSignal = "BULLISH"; painNote = `Spot ${Math.abs(painPct).toFixed(1)}% below Max Pain ${max_pain.toLocaleString("en-IN")} — gravity pull UP`; }
-    else                     { painSignal = "NEUTRAL";  painNote = `Spot near Max Pain ${max_pain.toLocaleString("en-IN")} — market at equilibrium`; }
+    if (painPct > 1.5)       { painSignal = "BEARISH"; painNote = `Spot ${painPct.toFixed(1)}% above Max Pain ${max_pain.toLocaleString("en-IN")} â€” gravity pull DOWN`; }
+    else if (painPct < -1.5) { painSignal = "BULLISH"; painNote = `Spot ${Math.abs(painPct).toFixed(1)}% below Max Pain ${max_pain.toLocaleString("en-IN")} â€” gravity pull UP`; }
+    else                     { painSignal = "NEUTRAL";  painNote = `Spot near Max Pain ${max_pain.toLocaleString("en-IN")} â€” market at equilibrium`; }
 
     // OI skew
     const skewPct = total_ce_oi + total_pe_oi > 0 ? ((total_pe_oi - total_ce_oi) / (total_pe_oi + total_ce_oi)) * 100 : 0;
     let skewNote: string;
-    if (skewPct > 10)       skewNote = `PE OI ${skewPct.toFixed(0)}% heavier — strong put base, market supported`;
-    else if (skewPct < -10) skewNote = `CE OI ${Math.abs(skewPct).toFixed(0)}% heavier — call wall overhead, market capped`;
-    else                    skewNote = `CE/PE OI balanced (skew ${skewPct.toFixed(0)}%) — no directional bias from writing`;
+    if (skewPct > 10)       skewNote = `PE OI ${skewPct.toFixed(0)}% heavier â€” strong put base, market supported`;
+    else if (skewPct < -10) skewNote = `CE OI ${Math.abs(skewPct).toFixed(0)}% heavier â€” call wall overhead, market capped`;
+    else                    skewNote = `CE/PE OI balanced (skew ${skewPct.toFixed(0)}%) â€” no directional bias from writing`;
 
     // Key levels from OI
     let maxCeOiStrike = 0, maxCeOi = 0, maxPeOiStrike = 0, maxPeOi = 0;
@@ -761,7 +761,46 @@ export default function OptionsChain() {
   const maxProfit = payoff?.max_profit !== undefined ? payoff.max_profit : null;
   const maxLoss = payoff?.max_loss !== undefined ? payoff.max_loss : null;
 
-  // SL / TP levels in ₹ (based on net premium of the position)
+  // Drag-to-reorder state for leg cards
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dropIdx, setDropIdx] = useState<number | null>(null);
+
+  // Strategy auto-detection from leg structure
+  const detectedStrategy = useMemo(() => {
+    if (legs.length === 0) return "New Strategy";
+    const sells = legs.filter(l => l.action === "SELL");
+    const buys  = legs.filter(l => l.action === "BUY");
+    const ceLegs = legs.filter(l => l.opt_type === "CE");
+    const peLegs = legs.filter(l => l.opt_type === "PE");
+    const uniqueStrikes = new Set(legs.map(l => l.strike)).size;
+    if (legs.length === 2 && sells.length === 2 && uniqueStrikes === 1 && ceLegs.length === 1 && peLegs.length === 1)
+      return "Short Straddle";
+    if (legs.length === 2 && buys.length  === 2 && uniqueStrikes === 1 && ceLegs.length === 1 && peLegs.length === 1)
+      return "Long Straddle";
+    if (legs.length === 2 && sells.length === 2 && uniqueStrikes === 2 && ceLegs.length === 1 && peLegs.length === 1)
+      return "Short Strangle";
+    if (legs.length === 2 && buys.length  === 2 && uniqueStrikes === 2 && ceLegs.length === 1 && peLegs.length === 1)
+      return "Long Strangle";
+    if (legs.length === 4 && buys.length === 2 && sells.length === 2 && ceLegs.length === 2 && peLegs.length === 2)
+      return "Iron Condor";
+    if (legs.length === 3 && sells.length === 2 && buys.length === 1 && ceLegs.length === 3)
+      return "Call Butterfly";
+    if (legs.length === 3 && sells.length === 2 && buys.length === 1 && peLegs.length === 3)
+      return "Put Butterfly";
+    if (legs.length === 2 && uniqueStrikes === 2 && ceLegs.length === 2 && buys.length === 1 && sells.length === 1) {
+      const [buy] = buys; const [sell] = sells;
+      return buy.strike < sell.strike ? "Bull Call Spread" : "Bear Call Spread";
+    }
+    if (legs.length === 2 && uniqueStrikes === 2 && peLegs.length === 2 && buys.length === 1 && sells.length === 1) {
+      const [buy] = buys; const [sell] = sells;
+      return buy.strike > sell.strike ? "Bear Put Spread" : "Bull Put Spread";
+    }
+    if (legs.length === 1 && buys.length === 1)  return buys[0].opt_type === "CE" ? "Long Call"  : "Long Put";
+    if (legs.length === 1 && sells.length === 1) return sells[0].opt_type === "CE" ? "Short Call" : "Short Put";
+    return `${legs.length} Leg Strategy`;
+  }, [legs]);
+
+  // SL / TP levels in â‚¹ (based on net premium of the position)
   const premium = payoff ? Math.abs(payoff.net_premium) : 0;
   const slLevel = slEnabled && payoff ? -(premium * slPct / 100) : null;
   const tpLevel = tpEnabled && payoff ? (premium * tpPct / 100) : null;
@@ -773,7 +812,7 @@ export default function OptionsChain() {
       {error && (
         <div className="bg-red-900/20 border border-red-500/40 text-red-300 px-4 py-3 rounded-xl text-xs flex justify-between items-center">
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300 font-bold ml-2">✕</button>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-300 font-bold ml-2">âœ•</button>
         </div>
       )}
       
@@ -839,7 +878,7 @@ export default function OptionsChain() {
                 <span className="text-xs text-gray-500">Date</span>
                 <button onClick={() => goDay(-1)}
                   className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-600 rounded text-xs text-gray-400"
-                  title="Previous trading day">◀</button>
+                  title="Previous trading day">â—€</button>
                 <input type="date" value={selectedDate}
                   onChange={(e) => handleDateChange(e.target.value)}
                   max={localDateStr(new Date())}
@@ -847,11 +886,11 @@ export default function OptionsChain() {
                 <button onClick={() => goDay(1)}
                   disabled={selectedDate >= localDateStr(new Date())}
                   className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-600 rounded text-xs text-gray-400 disabled:opacity-30"
-                  title="Next trading day">▶</button>
+                  title="Next trading day">â–¶</button>
               </div>
             )}
 
-            {/* Live Today Toggle — disabled after market close */}
+            {/* Live Today Toggle â€” disabled after market close */}
             <button
               onClick={() => {
                 // After 15:30 market is closed: switch to historical with latest data
@@ -872,7 +911,7 @@ export default function OptionsChain() {
                   handleDateChange(latest);
                 }
               }}
-              title={isMarketClosed() ? "Market closed — showing last available data" : "Stream today's live market session"}
+              title={isMarketClosed() ? "Market closed â€” showing last available data" : "Stream today's live market session"}
               className={`px-4 py-1.5 rounded-lg text-xs font-extrabold flex items-center gap-2 border transition-all ${
                 isLive
                   ? "bg-green-600/20 border-green-500/40 text-green-300 shadow-md shadow-green-950/40"
@@ -895,7 +934,7 @@ export default function OptionsChain() {
                         : "bg-emerald-600/15 border-emerald-500/40 text-emerald-300"
                 }`}>
                   <span className={`w-1.5 h-1.5 rounded-full inline-block ${stale ? "bg-amber-400" : "bg-emerald-400 animate-pulse"}`} />
-                  {stale ? "LAST FETCHED" : `LIVE · ${src}`}
+                  {stale ? "LAST FETCHED" : `LIVE Â· ${src}`}
                   {data?.timestamp && (
                     <span className="text-gray-400 font-mono font-normal ml-1">
                       {new Date(data.timestamp).toLocaleTimeString("en-IN", { hour12: false })}
@@ -914,7 +953,7 @@ export default function OptionsChain() {
               onClick={() => setShowSavedList(!showSavedList)}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-750 transition-all"
             >
-              💼 Saved Workspaces ({savedStrategies.length})
+              ðŸ’¼ Saved Workspaces ({savedStrategies.length})
             </button>
 
             <div className="flex bg-gray-950 rounded-lg p-1 border border-gray-700">
@@ -929,7 +968,7 @@ export default function OptionsChain() {
                       : "text-gray-500 hover:text-gray-300"
                   }`}
                 >
-                  {mode === "ATM_5" ? "ATM ± 5" : mode === "ATM_10" ? "ATM ± 10" : "All"}
+                  {mode === "ATM_5" ? "ATM Â± 5" : mode === "ATM_10" ? "ATM Â± 10" : "All"}
                 </button>
               ))}
             </div>
@@ -981,14 +1020,14 @@ export default function OptionsChain() {
             <div className="flex items-center gap-1.5 border-r border-gray-800 pr-3">
               <button onClick={() => goDay(-1)}
                 className="w-7 h-7 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-600 rounded-lg text-xs text-gray-400"
-                title="Previous day">◀</button>
+                title="Previous day">â—€</button>
               <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 min-w-[88px] text-center">
-                {selectedDate || "—"}
+                {selectedDate || "â€”"}
               </span>
               <button onClick={() => goDay(1)}
                 disabled={!selectedDate || selectedDate >= localDateStr(new Date())}
                 className="w-7 h-7 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-600 rounded-lg text-xs text-gray-400 disabled:opacity-30"
-                title="Next day">▶</button>
+                title="Next day">â–¶</button>
             </div>
 
             {/* Time display */}
@@ -1002,12 +1041,12 @@ export default function OptionsChain() {
             {/* Time slider */}
             <div className="flex-1 flex items-center gap-2 min-w-[200px]">
               <button onClick={() => setSliderVal((v) => Math.max(555, v - 1))} disabled={sliderVal <= 555}
-                className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-700 rounded text-xs text-gray-400 disabled:opacity-30">◀</button>
+                className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-700 rounded text-xs text-gray-400 disabled:opacity-30">â—€</button>
               <input type="range" min={555} max={930} value={sliderVal}
                 onChange={(e) => setSliderVal(Number(e.target.value))}
                 className="flex-1 accent-blue-500 h-1 bg-gray-800 rounded-lg cursor-pointer" />
               <button onClick={() => setSliderVal((v) => Math.min(930, v + 1))} disabled={sliderVal >= 930}
-                className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-700 rounded text-xs text-gray-400 disabled:opacity-30">▶</button>
+                className="w-6 h-6 flex items-center justify-center bg-gray-900 border border-gray-800 hover:border-gray-700 rounded text-xs text-gray-400 disabled:opacity-30">â–¶</button>
             </div>
 
             {/* Time presets */}
@@ -1026,7 +1065,7 @@ export default function OptionsChain() {
       {/* Saved Strategy list overlay panel */}
       {showSavedList && (
         <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-2xl relative">
-          <button onClick={() => setShowSavedList(false)} className="absolute top-3 right-4 text-gray-450 hover:text-white text-xs font-semibold">✕ Close</button>
+          <button onClick={() => setShowSavedList(false)} className="absolute top-3 right-4 text-gray-450 hover:text-white text-xs font-semibold">âœ• Close</button>
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Saved Strategies Workspace</h3>
           {savedStrategies.length === 0 ? (
             <p className="text-xs text-gray-500">No saved strategy templates found in database. Build a strategy and save it below!</p>
@@ -1041,7 +1080,7 @@ export default function OptionsChain() {
                   <div>
                     <h4 className="text-sm font-bold text-blue-400">{saved.name}</h4>
                     <div className="text-[10px] text-gray-500 font-mono mt-1">
-                      {saved.underlying} · Expiry: {saved.expiry}
+                      {saved.underlying} Â· Expiry: {saved.expiry}
                     </div>
                     <div className="mt-2.5 flex flex-wrap gap-1">
                       {saved.legs.map((l, idx) => (
@@ -1096,30 +1135,30 @@ export default function OptionsChain() {
               oiAnalysis.verdict === "BEARISH" ? "bg-red-900/50 text-red-400 border-red-700/50" :
               "bg-yellow-900/30 text-yellow-400 border-yellow-700/40"
             }`}>
-              {oiAnalysis.verdict === "BULLISH" ? "↑ BULLISH" : oiAnalysis.verdict === "BEARISH" ? "↓ BEARISH" : "→ NEUTRAL"}
+              {oiAnalysis.verdict === "BULLISH" ? "â†‘ BULLISH" : oiAnalysis.verdict === "BEARISH" ? "â†“ BEARISH" : "â†’ NEUTRAL"}
             </span>
             <span className="text-[10px] text-gray-600 italic">Based on live OI positioning</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
             <div className={`flex items-start gap-2 p-2.5 rounded-lg bg-gray-950/60 border ${oiAnalysis.pcrSignal === "BULLISH" ? "border-green-800/40" : oiAnalysis.pcrSignal === "BEARISH" ? "border-red-800/40" : "border-gray-800/60"}`}>
-              <span>📊</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.pcrNote}</span>
+              <span>ðŸ“Š</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.pcrNote}</span>
             </div>
             <div className={`flex items-start gap-2 p-2.5 rounded-lg bg-gray-950/60 border ${oiAnalysis.painSignal === "BULLISH" ? "border-green-800/40" : oiAnalysis.painSignal === "BEARISH" ? "border-red-800/40" : "border-gray-800/60"}`}>
-              <span>🎯</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.painNote}</span>
+              <span>ðŸŽ¯</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.painNote}</span>
             </div>
             <div className="flex items-start gap-2 p-2.5 rounded-lg bg-gray-950/60 border border-gray-800/60">
-              <span>⚖️</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.skewNote}</span>
+              <span>âš–ï¸</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.skewNote}</span>
             </div>
             <div className="flex items-start gap-2 p-2.5 rounded-lg bg-gray-950/60 border border-gray-800/60">
-              <span>📍</span>
+              <span>ðŸ“</span>
               <span className="text-gray-300 leading-relaxed">
                 Resistance: <span className="font-bold text-red-400">{oiAnalysis.maxCeOiStrike.toLocaleString("en-IN")}</span>
                 {" "}({fmtLargeNum(oiAnalysis.maxCeOi)} CE OI)
-                {"  ·  "}
+                {"  Â·  "}
                 Support: <span className="font-bold text-green-400">{oiAnalysis.maxPeOiStrike.toLocaleString("en-IN")}</span>
                 {" "}({fmtLargeNum(oiAnalysis.maxPeOi)} PE OI)
-                {oiAnalysis.aboveResistance && <span className="text-orange-400 font-bold"> ⚠ Spot above resistance!</span>}
-                {oiAnalysis.belowSupport && <span className="text-orange-400 font-bold"> ⚠ Spot below support!</span>}
+                {oiAnalysis.aboveResistance && <span className="text-orange-400 font-bold"> âš  Spot above resistance!</span>}
+                {oiAnalysis.belowSupport && <span className="text-orange-400 font-bold"> âš  Spot below support!</span>}
               </span>
             </div>
           </div>
@@ -1421,7 +1460,7 @@ export default function OptionsChain() {
           </div>
 
           <div className="bg-gray-950 border border-gray-850 rounded-lg p-3 text-[11px] text-gray-400 space-y-2 leading-relaxed">
-            <h4 className="font-semibold text-gray-300">💡 Opstra Workspace Guide:</h4>
+            <h4 className="font-semibold text-gray-300">ðŸ’¡ Opstra Workspace Guide:</h4>
             <p>
               Click **B** (Buy) or **S** (Sell) buttons next to the CE/PE prices in the table to instantly add option legs into the Strategy Workspace below.
             </p>
@@ -1429,505 +1468,502 @@ export default function OptionsChain() {
         </div>
       </div>
 
-      {/* Embedded Strategy Workspace & Payoff Diagram (Opstra Style) */}
+      {/* â•â• TRADE SIMULATOR WORKSPACE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
       {legs.length > 0 && (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 shadow-2xl space-y-6">
-          <div className="flex items-center justify-between border-b border-gray-850 pb-3">
-            <div>
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Strategy Builder Workspace (Opstra-Style)</h3>
-              <p className="text-[10px] text-gray-500 mt-0.5">Customize your options profile, analyze the payoff, and save to database.</p>
+        <div style={{ border: "1px solid var(--ts-border)", background: "var(--ts-bg-card)", borderRadius: "18px", overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.5)" }}>
+
+          {/* Header */}
+          <div style={{ background: "var(--ts-bg-elevated)", borderBottom: "1px solid var(--ts-border)" }}
+            className="flex items-center gap-3 px-5 py-3 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
+              <span style={{ color: "var(--ts-text)", fontSize: "16px", fontWeight: 800 }}>{detectedStrategy}</span>
+              <span style={{ color: "var(--ts-muted)", fontSize: "13px" }}>Â· {legs.length} leg{legs.length > 1 ? "s" : ""}</span>
+              {spotPrice && (
+                <span style={{ color: "var(--ts-text-secondary)", fontFamily: "monospace", fontSize: "13px", marginLeft: "8px" }}>
+                  SPOT {fmtPrice(spotPrice)}
+                </span>
+              )}
             </div>
-            <button
-              onClick={handleClearLegs}
-              className="px-3 py-1 bg-red-950 hover:bg-red-900 border border-red-800 text-red-400 text-xs font-semibold rounded-lg transition-colors"
-            >
-              Clear Workspace
-            </button>
+            <div className="flex items-center gap-2 ml-auto flex-wrap">
+              <input
+                type="text"
+                placeholder="Name this strategyâ€¦"
+                value={strategyName}
+                onChange={e => setStrategyName(e.target.value)}
+                className="placeholder-gray-600"
+                style={{
+                  background: "var(--ts-bg-surface)", color: "var(--ts-text)",
+                  border: "1px solid var(--ts-border)", borderRadius: "8px",
+                  padding: "6px 12px", fontSize: "13px", width: "180px", outline: "none",
+                }}
+              />
+              <button onClick={handleSaveStrategy}
+                style={{ background: "var(--ts-accent)", color: "#fff", borderRadius: "8px", padding: "6px 14px", fontSize: "13px", fontWeight: 700, border: "none", cursor: "pointer" }}
+                className="hover:opacity-90 transition-opacity">Save</button>
+              <button onClick={() => setShowSavedList(v => !v)}
+                style={{ background: "var(--ts-bg-surface)", color: "var(--ts-text-secondary)", border: "1px solid var(--ts-border)", borderRadius: "8px", padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}
+                className="hover:opacity-80 transition-opacity">Saved ({savedStrategies.length})</button>
+              <button onClick={handleClearLegs}
+                style={{ color: "var(--ts-loss)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: "8px", padding: "6px 12px", fontSize: "13px", fontWeight: 700, background: "transparent", cursor: "pointer" }}
+                className="hover:bg-red-950/40 transition-colors">Clear All</button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-            
-            {/* Left Column: Active Legs Control Table (5 cols) */}
-            <div className="xl:col-span-5 space-y-4 flex flex-col justify-between">
-              
-              {/* Compact Opstra-style leg table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs font-mono border-collapse">
-                  <thead>
-                    <tr className="text-[9px] text-gray-500 uppercase tracking-wider border-b border-gray-800">
-                      <th className="py-1.5 px-1 text-center w-5" />
-                      <th className="py-1.5 px-1 text-center" title="Show in payoff">👁</th>
-                      <th className="py-1.5 px-1 text-left">B/S</th>
-                      <th className="py-1.5 px-1 text-center">Strike</th>
-                      <th className="py-1.5 px-1 text-center">Type</th>
-                      <th className="py-1.5 px-1 text-center text-amber-400">Expiry</th>
-                      <th className="py-1.5 px-1 text-center">Lots</th>
-                      <th className="py-1.5 px-1 text-right">Entry ₹</th>
-                      <th className="py-1.5 px-1 text-right">LTP</th>
-                      {isLive && <th className="py-1.5 px-1 text-right">P&amp;L</th>}
-                      <th className="py-1.5 px-1" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-800/60">
-                    {legs.map((leg) => {
-                      const currentLtp = getLegLtp(data, leg);
-                      const pnl = getLegPnl(data, leg);
-                      const isBuy = leg.action === "BUY";
-                      const rowTint = isBuy ? "bg-emerald-950/15" : "bg-rose-950/15";
-                      const strikeOpts = data?.chain?.map((r) => r.strike) ?? [];
-                      const isExpanded = expandedLegs.has(leg.id);
+          {/* Saved strategies panel */}
+          {showSavedList && (
+            <div style={{ borderBottom: "1px solid var(--ts-border)", background: "var(--ts-bg-surface)" }} className="px-5 py-3">
+              {savedStrategies.length === 0 ? (
+                <p style={{ color: "var(--ts-muted)", fontSize: "12px" }}>No saved strategies yet.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                  {savedStrategies.map(s => (
+                    <div key={s.id}
+                      style={{ border: "1px solid var(--ts-border)", borderRadius: "10px", background: "var(--ts-bg-card)", cursor: "pointer" }}
+                      className="px-3 py-2 hover:border-blue-500/50 transition-colors"
+                      onClick={() => handleLoadStrategy(s)}>
+                      <div style={{ color: "var(--ts-text)", fontWeight: 700, fontSize: "13px" }}>{s.name}</div>
+                      <div style={{ color: "var(--ts-muted)", fontSize: "11px" }}>{s.underlying} Â· {s.expiry} Â· {s.legs.length} legs</div>
+                      <button onClick={e => handleDeleteSaved(s.id, e)}
+                        style={{ color: "var(--ts-loss)", fontSize: "11px", marginTop: "4px", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                        Delete
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
-                      // Per-leg SL/TP levels and hit detection
-                      const slPct = leg.sl_pct ?? 50;
-                      const tpPct = leg.tp_pct ?? 50;
-                      const slPrice = isBuy
-                        ? leg.entry_price * (1 - slPct / 100)
-                        : leg.entry_price * (1 + slPct / 100);
-                      const tpPrice = isBuy
-                        ? leg.entry_price * (1 + tpPct / 100)
-                        : leg.entry_price * (1 - tpPct / 100);
-                      const legSlHit = leg.sl_enabled && currentLtp !== null && (isBuy ? currentLtp <= slPrice : currentLtp >= slPrice);
-                      const legTpHit = leg.tp_enabled && currentLtp !== null && (isBuy ? currentLtp >= tpPrice : currentLtp <= tpPrice);
+          {/* Two-panel body */}
+          <div className="grid grid-cols-1 xl:grid-cols-5">
 
-                      return (
-                        <>
-                        <tr key={leg.id}
-                          className={`transition-colors ${rowTint} ${leg.visible ? "" : "opacity-40"} hover:bg-gray-900/60 ${isExpanded ? "border-b-0" : ""}`}>
-                          {/* Expand/collapse toggle */}
-                          <td className="py-1.5 px-1 text-center">
-                            <button onClick={() => toggleLegExpand(leg.id)}
-                              className={`text-[9px] transition-all w-4 h-4 flex items-center justify-center rounded ${isExpanded ? "text-blue-400 bg-blue-900/30" : "text-gray-600 hover:text-gray-300"}`}
-                              title="Expand leg details">
-                              {isExpanded ? "▼" : "▶"}
-                            </button>
-                          </td>
-                          <td className="py-1.5 px-1 text-center">
-                            <input type="checkbox" checked={leg.visible}
-                              onChange={() => handleToggleVisible(leg.id)}
-                              className="accent-blue-500 cursor-pointer align-middle" title="Show in payoff" />
-                          </td>
-                          <td className="py-1.5 px-1">
-                            <button
-                              onClick={() => handleToggleAction(leg.id)}
-                              title="Click to toggle Buy/Sell"
-                              className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold border cursor-pointer transition-colors ${
-                                isBuy
-                                  ? "bg-green-950 text-green-400 border-green-900/40 hover:bg-green-900/40"
-                                  : "bg-red-950 text-red-400 border-red-900/40 hover:bg-red-900/40"
-                              }`}>
-                              {isBuy ? "B" : "S"}
-                            </button>
-                          </td>
-                          <td className="py-1.5 px-1 text-center">
-                            {strikeOpts.length > 0 ? (
-                              <select value={leg.strike}
-                                onChange={(e) => handleRetarget(leg.id, { strike: Number(e.target.value) })}
-                                className="bg-gray-900 border border-gray-800 rounded px-1 py-0.5 text-[11px] text-white font-bold text-center focus:outline-none focus:border-blue-600">
-                                {strikeOpts.map((s) => <option key={s} value={s}>{s}</option>)}
-                              </select>
-                            ) : (
-                              <input type="number" value={leg.strike}
-                                onChange={(e) => handleRetarget(leg.id, { strike: Number(e.target.value) })}
-                                className="w-16 bg-gray-900 border border-gray-800 rounded px-1 py-0.5 text-[11px] text-white font-bold text-center focus:outline-none focus:border-blue-600" />
-                            )}
-                          </td>
-                          <td className="py-1.5 px-1 text-center">
-                            <select value={leg.opt_type}
-                              onChange={(e) => handleRetarget(leg.id, { opt_type: e.target.value as "CE" | "PE" })}
-                              className={`bg-gray-900 border border-gray-800 rounded px-1 py-0.5 text-[11px] font-bold text-center focus:outline-none focus:border-blue-600 ${leg.opt_type === "CE" ? "text-red-400" : "text-green-400"}`}>
-                              <option value="CE">CE</option>
-                              <option value="PE">PE</option>
-                            </select>
-                          </td>
-                          <td className="py-1.5 px-1 text-center">
-                            <select
-                              value={leg.expiry || (isLive ? liveExpiry : selectedExpiry)}
-                              onChange={(e) => handleUpdateLeg(leg.id, { expiry: e.target.value })}
-                              title="Leg expiry — change for calendar/diagonal spreads"
-                              className="bg-gray-900 border border-gray-800 rounded px-1 py-0.5 text-[10px] text-amber-300 font-mono focus:outline-none focus:border-blue-600">
-                              {availableExpiries.map((exp) => (
-                                <option key={exp} value={exp}>{exp.slice(5)}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="py-1.5 px-1">
-                            <input
-                              type="number" min="1" value={leg.lots}
-                              onChange={(e) => handleUpdateLeg(leg.id, { lots: Math.max(1, Number(e.target.value)) })}
-                              className="w-12 bg-gray-900 border border-gray-800 rounded px-1.5 py-0.5 text-[11px] text-white text-center focus:outline-none focus:border-blue-600"
-                            />
-                          </td>
-                          <td className="py-1.5 px-1">
-                            <input
-                              type="number" step="0.05" value={leg.entry_price}
-                              onChange={(e) => handleUpdateLeg(leg.id, { entry_price: Number(e.target.value) })}
-                              className="w-16 bg-gray-900 border border-gray-800 rounded px-1.5 py-0.5 text-[11px] text-white text-right focus:outline-none focus:border-blue-600"
-                            />
-                          </td>
-                          <td className="py-1.5 px-1 text-right text-gray-300">
-                            {currentLtp !== null ? currentLtp.toFixed(2) : "—"}
-                          </td>
-                          {isLive && (
-                            <td className="py-1.5 px-1 text-right">
-                              {pnl !== null ? (
-                                <span className={`text-[10px] font-bold ${pnl >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                  {pnl >= 0 ? "+" : ""}₹{Math.round(pnl).toLocaleString("en-IN")}
-                                </span>
-                              ) : "—"}
-                            </td>
-                          )}
-                          <td className="py-1.5 px-1 text-center">
-                            <div className="flex items-center gap-1">
-                              {(legSlHit || legTpHit) && (
-                                <span className={`text-[8px] font-extrabold px-1 py-0.5 rounded animate-pulse ${legTpHit ? "bg-green-900/50 text-green-300" : "bg-red-900/50 text-red-300"}`}>
-                                  {legTpHit ? "TP" : "SL"}
-                                </span>
-                              )}
-                              <button
-                                onClick={() => handleRemoveLeg(leg.id)}
-                                className="text-gray-600 hover:text-red-400 transition-colors text-xs"
-                                title="Remove"
-                              >🗑</button>
-                            </div>
-                          </td>
-                        </tr>
-
-                        {/* Accordion: SL/TP + entry time per leg */}
-                        {isExpanded && (() => {
-                          const nowHHMM = new Date().toTimeString().slice(0, 5);
-                          const entryPassed = !leg.entry_time || nowHHMM >= leg.entry_time;
-                          const exitPassed = !!leg.exit_time && nowHHMM >= leg.exit_time;
-                          const inpCls = "bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-sm text-white font-mono focus:outline-none focus:border-blue-500";
-                          return (
-                          <tr key={`${leg.id}-detail`} className={`${rowTint}`}>
-                            <td colSpan={isLive ? 11 : 10} className="px-3 pb-4 pt-1">
-                              <div className="bg-gray-950/80 border border-gray-800 rounded-xl p-4 space-y-4">
-
-                                {/* Entry / Exit time row */}
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div className="space-y-1.5">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">Entry Time</span>
-                                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${entryPassed ? "bg-emerald-900/40 text-emerald-400" : "bg-amber-900/40 text-amber-400"}`}>
-                                        {entryPassed ? "✓ ENTERED" : "⏳ WAITING"}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <input type="time" value={leg.entry_time ?? "09:15"}
-                                        onChange={e => handleUpdateLeg(leg.id, { entry_time: e.target.value })}
-                                        className={`${inpCls} w-32`} />
-                                      <button onClick={() => handleUpdateLeg(leg.id, { entry_time: nowHHMM })}
-                                        className="px-2.5 py-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white text-xs border border-gray-700">
-                                        Now
-                                      </button>
-                                    </div>
-                                    {leg.added_at && (
-                                      <div className="text-[10px] text-gray-600">
-                                        Added: {new Date(leg.added_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <div className="space-y-1.5">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">Exit Time</span>
-                                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${exitPassed ? "bg-red-900/40 text-red-400" : "bg-gray-800 text-gray-500"}`}>
-                                        {exitPassed ? "⏹ EXITED" : leg.exit_time ? "⏳ ACTIVE" : "—"}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <input type="time" value={leg.exit_time ?? "15:25"}
-                                        onChange={e => handleUpdateLeg(leg.id, { exit_time: e.target.value })}
-                                        className={`${inpCls} w-32`} />
-                                      <button onClick={() => handleUpdateLeg(leg.id, { exit_time: "15:25" })}
-                                        className="px-2.5 py-1.5 rounded-lg bg-gray-800 text-gray-400 hover:text-white text-xs border border-gray-700">
-                                        3:25
-                                      </button>
-                                    </div>
-                                    <div className="text-[10px] text-gray-600">Square off at this time regardless of P&L</div>
-                                  </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                  {/* Stop Loss */}
-                                  <div className={`p-3 rounded-xl border ${leg.sl_enabled ? (legSlHit ? "border-red-600/60 bg-red-950/20" : "border-orange-700/50 bg-orange-950/10") : "border-gray-800"}`}>
-                                    <div className="flex items-center justify-between mb-3">
-                                      <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">Stop Loss</span>
-                                      <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="checkbox" checked={leg.sl_enabled ?? false}
-                                          onChange={e => handleUpdateLeg(leg.id, { sl_enabled: e.target.checked })}
-                                          className="accent-orange-500 w-4 h-4" />
-                                        <span className="text-xs text-gray-400 font-medium">Enable</span>
-                                      </label>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                      <input type="number" min={1} max={200} value={slPct}
-                                        onChange={e => handleUpdateLeg(leg.id, { sl_pct: Math.max(1, Number(e.target.value)) })}
-                                        disabled={!leg.sl_enabled}
-                                        className={`w-16 ${inpCls} disabled:opacity-40 text-sm`} />
-                                      <span className="text-sm text-gray-400">% of premium</span>
-                                    </div>
-                                    {leg.sl_enabled && (
-                                      <>
-                                        <div className={`mt-2 text-base font-bold font-mono ${legSlHit ? "text-red-400 animate-pulse" : "text-orange-400"}`}>
-                                          Trigger @ ₹{slPrice.toFixed(2)} {legSlHit ? " ⚠ SL HIT" : ""}
-                                        </div>
-                                        <div className="mt-1 text-xs text-gray-500">
-                                          {isBuy ? `Exit when LTP falls below ₹${slPrice.toFixed(2)}` : `Exit when LTP rises above ₹${slPrice.toFixed(2)}`}
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-
-                                  {/* Take Profit */}
-                                  <div className={`p-3 rounded-xl border ${leg.tp_enabled ? (legTpHit ? "border-green-600/60 bg-green-950/20" : "border-lime-700/50 bg-lime-950/10") : "border-gray-800"}`}>
-                                    <div className="flex items-center justify-between mb-3">
-                                      <span className="text-xs font-bold text-gray-300 uppercase tracking-wider">Take Profit</span>
-                                      <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="checkbox" checked={leg.tp_enabled ?? false}
-                                          onChange={e => handleUpdateLeg(leg.id, { tp_enabled: e.target.checked })}
-                                          className="accent-green-500 w-4 h-4" />
-                                        <span className="text-xs text-gray-400 font-medium">Enable</span>
-                                      </label>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                      <input type="number" min={1} max={500} value={tpPct}
-                                        onChange={e => handleUpdateLeg(leg.id, { tp_pct: Math.max(1, Number(e.target.value)) })}
-                                        disabled={!leg.tp_enabled}
-                                        className={`w-16 ${inpCls} disabled:opacity-40 text-sm`} />
-                                      <span className="text-sm text-gray-400">% of premium</span>
-                                    </div>
-                                    {leg.tp_enabled && (
-                                      <>
-                                        <div className={`mt-2 text-base font-bold font-mono ${legTpHit ? "text-green-400 animate-pulse" : "text-lime-400"}`}>
-                                          Trigger @ ₹{tpPrice.toFixed(2)} {legTpHit ? " ✓ TARGET HIT" : ""}
-                                        </div>
-                                        <div className="mt-1 text-xs text-gray-500">
-                                          {isBuy ? `Exit when LTP rises above ₹${tpPrice.toFixed(2)}` : `Exit when LTP falls below ₹${tpPrice.toFixed(2)}`}
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {/* Status bar */}
-                                <div className="flex items-center gap-4 pt-2 border-t border-gray-800/60">
-                                  <span className="text-xs text-gray-500 font-mono">Entry ₹{leg.entry_price.toFixed(2)}</span>
-                                  {currentLtp !== null && <span className="text-xs text-gray-400 font-mono">LTP ₹{currentLtp.toFixed(2)}</span>}
-                                  {pnl !== null && (
-                                    <span className={`text-sm font-bold font-mono ${pnl >= 0 ? "text-green-400" : "text-red-400"}`}>
-                                      P&L {pnl >= 0 ? "+" : ""}₹{Math.round(pnl).toLocaleString("en-IN")}
-                                    </span>
-                                  )}
-                                  <span className={`ml-auto px-3 py-1 rounded-lg font-bold text-xs ${
-                                    exitPassed ? "bg-gray-800 text-gray-400" :
-                                    legTpHit ? "bg-green-900/50 text-green-300 border border-green-700/40" :
-                                    legSlHit ? "bg-red-900/50 text-red-300 border border-red-700/40 animate-pulse" :
-                                    !entryPassed ? "bg-amber-900/30 text-amber-400 border border-amber-700/30" :
-                                    (leg.sl_enabled || leg.tp_enabled) ? "bg-blue-900/30 text-blue-400 border border-blue-700/30" :
-                                    "bg-gray-800 text-gray-600"
-                                  }`}>
-                                    {exitPassed ? "⏹ EXITED" : legTpHit ? "✓ TARGET HIT" : legSlHit ? "⚠ SL HIT" : !entryPassed ? "⏳ WAITING" : (leg.sl_enabled || leg.tp_enabled) ? "● RUNNING" : "NO GUARD"}
-                                  </span>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                        })()}
-                        </>
-                      );
-                    })}
-                  </tbody>
-                </table>
+            {/* â”€â”€ LEFT: Leg card strip (2/5) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            <div className="xl:col-span-2 flex flex-col" style={{ borderRight: "1px solid var(--ts-border)" }}>
+              <div className="px-4 pt-3 pb-1">
+                <span style={{ color: "var(--ts-muted)", fontSize: "10px", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                  Legs â€” drag to reorder
+                </span>
               </div>
 
-              {/* Total paper P&L */}
-              {isLive && legs.length > 0 && (() => {
-                const total = legs.reduce((sum, leg) => {
-                  const p = getLegPnl(data, leg);
-                  return p !== null ? sum + p : sum;
-                }, 0);
-                const hasPnl = legs.some(leg => getLegPnl(data, leg) !== null);
-                if (!hasPnl) return null;
+              <div className="flex-1 px-3 pb-3 space-y-2 overflow-y-auto" style={{ maxHeight: "680px" }}>
+                {legs.map((leg, idx) => {
+                  const isBuy = leg.action === "BUY";
+                  const currentLtp = getLegLtp(data, leg);
+                  const pnl = getLegPnl(data, leg);
+                  const strikeOpts = data?.chain?.map(r => r.strike) ?? [];
+                  const isExpanded = expandedLegs.has(leg.id);
+                  const isDragging = dragIdx === idx;
+                  const isOver = dropIdx === idx && dragIdx !== null && dragIdx !== idx;
+                  const legSlPct = leg.sl_pct ?? 50;
+                  const legTpPct = leg.tp_pct ?? 50;
+                  const slPriceLeg = isBuy
+                    ? leg.entry_price * (1 - legSlPct / 100)
+                    : leg.entry_price * (1 + legSlPct / 100);
+                  const tpPriceLeg = isBuy
+                    ? leg.entry_price * (1 + legTpPct / 100)
+                    : leg.entry_price * (1 - legTpPct / 100);
+                  const legSlHit = (leg.sl_enabled ?? false) && currentLtp !== null &&
+                    (isBuy ? currentLtp <= slPriceLeg : currentLtp >= slPriceLeg);
+                  const legTpHit = (leg.tp_enabled ?? false) && currentLtp !== null &&
+                    (isBuy ? currentLtp >= tpPriceLeg : currentLtp <= tpPriceLeg);
+                  const nowHHMM = new Date().toTimeString().slice(0, 5);
+                  const entryPassed = !leg.entry_time || nowHHMM >= leg.entry_time;
+                  const exitPassed = !!leg.exit_time && nowHHMM >= leg.exit_time;
+
+                  return (
+                    <div key={leg.id}
+                      draggable
+                      onDragStart={() => setDragIdx(idx)}
+                      onDragOver={e => { e.preventDefault(); setDropIdx(idx); }}
+                      onDrop={e => {
+                        e.preventDefault();
+                        if (dragIdx === null || dragIdx === idx) return;
+                        const nl = [...legs];
+                        const [moved] = nl.splice(dragIdx, 1);
+                        nl.splice(idx, 0, moved);
+                        setLegs(nl);
+                        setDragIdx(null);
+                        setDropIdx(null);
+                      }}
+                      onDragEnd={() => { setDragIdx(null); setDropIdx(null); }}
+                      style={{
+                        border: `1px solid ${isOver ? "var(--ts-accent)" : isBuy ? "var(--ts-buy-border)" : "var(--ts-sell-border)"}`,
+                        background: "var(--ts-bg-surface)",
+                        borderRadius: "12px",
+                        overflow: "hidden",
+                        opacity: isDragging ? 0.3 : 1,
+                        transition: "opacity 0.15s, border-color 0.15s",
+                        cursor: "grab",
+                      }}
+                    >
+                      {/* Card header */}
+                      <div style={{ background: isBuy ? "var(--ts-buy-bg)" : "var(--ts-sell-bg)" }}
+                        className="flex items-center gap-2 px-3 py-2.5">
+                        <span style={{ color: "var(--ts-muted)", fontSize: "18px", lineHeight: 1, userSelect: "none", flexShrink: 0 }}>â ¿</span>
+                        <button onClick={() => handleToggleAction(leg.id)}
+                          style={{
+                            background: isBuy ? "rgba(16,185,129,0.18)" : "rgba(239,68,68,0.18)",
+                            color: isBuy ? "var(--ts-buy-text)" : "var(--ts-sell-text)",
+                            border: `2px solid ${isBuy ? "var(--ts-buy-border)" : "var(--ts-sell-border)"}`,
+                            width: "28px", height: "28px", borderRadius: "7px", flexShrink: 0,
+                            fontWeight: 900, fontSize: "13px", cursor: "pointer",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}>{isBuy ? "B" : "S"}</button>
+                        {strikeOpts.length > 0 ? (
+                          <select value={leg.strike}
+                            onChange={e => handleRetarget(leg.id, { strike: Number(e.target.value) })}
+                            style={{
+                              background: "transparent", color: "var(--ts-text)", border: "none", outline: "none",
+                              fontSize: "15px", fontWeight: 700, fontFamily: "monospace", cursor: "pointer",
+                              flex: 1, minWidth: 0,
+                            }}>
+                            {strikeOpts.map(s => (
+                              <option key={s} value={s} style={{ background: "#1a1e2b" }}>{s}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input type="number" value={leg.strike}
+                            onChange={e => handleRetarget(leg.id, { strike: Number(e.target.value) })}
+                            style={{
+                              background: "transparent", color: "var(--ts-text)", border: "none", outline: "none",
+                              fontSize: "15px", fontWeight: 700, fontFamily: "monospace", flex: 1, minWidth: 0,
+                            }} />
+                        )}
+                        <select value={leg.opt_type}
+                          onChange={e => handleRetarget(leg.id, { opt_type: e.target.value as "CE" | "PE" })}
+                          style={{ background: "transparent", border: "none", outline: "none", cursor: "pointer", fontSize: "13px", fontWeight: 700,
+                            color: leg.opt_type === "CE" ? "var(--ts-sell-text)" : "var(--ts-buy-text)" }}>
+                          <option value="CE" style={{ background: "#1a1e2b" }}>CE</option>
+                          <option value="PE" style={{ background: "#1a1e2b" }}>PE</option>
+                        </select>
+                        <select value={leg.expiry || (isLive ? liveExpiry : selectedExpiry)}
+                          onChange={e => handleUpdateLeg(leg.id, { expiry: e.target.value })}
+                          style={{ background: "transparent", border: "none", outline: "none", cursor: "pointer",
+                            color: "var(--ts-warning)", fontSize: "11px", fontFamily: "monospace" }}>
+                          {availableExpiries.map(exp => (
+                            <option key={exp} value={exp} style={{ background: "#1a1e2b" }}>{exp.slice(5)}</option>
+                          ))}
+                        </select>
+                        <input type="checkbox" checked={leg.visible} onChange={() => handleToggleVisible(leg.id)}
+                          title="Include in payoff chart"
+                          style={{ accentColor: "var(--ts-accent)", width: "14px", height: "14px", cursor: "pointer", flexShrink: 0 }} />
+                        <button onClick={() => handleRemoveLeg(leg.id)}
+                          style={{ color: "var(--ts-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "15px", lineHeight: 1, padding: "2px 0", flexShrink: 0 }}
+                          className="hover:text-red-400 transition-colors">âœ•</button>
+                      </div>
+
+                      {/* Card body: Lots | Entry â‚¹ | LTP / P&L */}
+                      <div className="grid grid-cols-3" style={{ borderTop: "1px solid var(--ts-border)" }}>
+                        <div className="px-3 py-2" style={{ borderRight: "1px solid var(--ts-border)" }}>
+                          <div style={{ color: "var(--ts-muted)", fontSize: "10px", marginBottom: "3px" }}>Lots</div>
+                          <input type="number" min="1" value={leg.lots}
+                            onChange={e => handleUpdateLeg(leg.id, { lots: Math.max(1, Number(e.target.value)) })}
+                            style={{ background: "transparent", color: "var(--ts-text)", border: "none", outline: "none",
+                              width: "48px", textAlign: "center", fontWeight: 700, fontSize: "14px" }} />
+                        </div>
+                        <div className="px-3 py-2" style={{ borderRight: "1px solid var(--ts-border)" }}>
+                          <div style={{ color: "var(--ts-muted)", fontSize: "10px", marginBottom: "3px" }}>Entry â‚¹</div>
+                          <input type="number" step="0.05" value={leg.entry_price}
+                            onChange={e => handleUpdateLeg(leg.id, { entry_price: Number(e.target.value) })}
+                            style={{ background: "transparent", color: "var(--ts-text)", border: "none", outline: "none",
+                              width: "72px", textAlign: "right", fontFamily: "monospace", fontWeight: 700, fontSize: "14px" }} />
+                        </div>
+                        <div className="px-3 py-2">
+                          <div style={{ color: "var(--ts-muted)", fontSize: "10px", marginBottom: "3px" }}>LTP / P&L</div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span style={{ color: "var(--ts-text)", fontFamily: "monospace", fontWeight: 700, fontSize: "13px" }}>
+                              {currentLtp !== null ? currentLtp.toFixed(2) : "â€”"}
+                            </span>
+                            {pnl !== null && (
+                              <span style={{ color: pnl >= 0 ? "var(--ts-profit)" : "var(--ts-loss)", fontSize: "11px", fontWeight: 700 }}>
+                                {pnl >= 0 ? "+" : ""}â‚¹{Math.round(pnl).toLocaleString("en-IN")}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Expand footer */}
+                      <div style={{ borderTop: "1px solid var(--ts-border)", background: "var(--ts-bg-base)" }}
+                        className="px-3 py-1.5 flex items-center justify-between">
+                        <button onClick={() => toggleLegExpand(leg.id)}
+                          style={{ color: "var(--ts-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "11px" }}
+                          className="hover:text-white transition-colors">
+                          {isExpanded ? "â–² Hide SL/TP" : "â–¼ SL / TP / Schedule"}
+                        </button>
+                        <div className="flex items-center gap-2">
+                          {legSlHit && <span style={{ color: "var(--ts-loss)", background: "rgba(239,68,68,0.12)", borderRadius: "4px", fontSize: "10px", padding: "2px 6px", fontWeight: 700 }} className="animate-pulse">SL HIT</span>}
+                          {legTpHit && <span style={{ color: "var(--ts-profit)", background: "rgba(16,185,129,0.12)", borderRadius: "4px", fontSize: "10px", padding: "2px 6px", fontWeight: 700 }} className="animate-pulse">TP HIT</span>}
+                          {!entryPassed && !legSlHit && !legTpHit && <span style={{ color: "var(--ts-warning)", fontSize: "11px", fontWeight: 700 }}>â³</span>}
+                          {exitPassed && !legSlHit && !legTpHit && <span style={{ color: "var(--ts-muted)", fontSize: "11px", fontWeight: 700 }}>â¹</span>}
+                        </div>
+                      </div>
+
+                      {/* Accordion: SL/TP + schedule */}
+                      {isExpanded && (() => {
+                        const inp2: React.CSSProperties = {
+                          background: "var(--ts-bg-elevated)", color: "var(--ts-text)",
+                          border: "1px solid var(--ts-border)", borderRadius: "8px",
+                          padding: "5px 10px", fontSize: "13px", fontFamily: "monospace", outline: "none",
+                        };
+                        return (
+                          <div style={{ borderTop: "1px solid var(--ts-border)", background: "var(--ts-bg-base)" }}
+                            className="px-3 pt-3 pb-3 space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span style={{ color: "var(--ts-text-secondary)", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Entry</span>
+                                  <span style={{ color: entryPassed ? "var(--ts-profit)" : "var(--ts-warning)", background: entryPassed ? "rgba(16,185,129,0.10)" : "rgba(245,158,11,0.10)", borderRadius: "4px", fontSize: "9px", padding: "1px 5px", fontWeight: 700 }}>
+                                    {entryPassed ? "âœ“ IN" : "â³ WAIT"}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <input type="time" value={leg.entry_time ?? "09:15"} onChange={e => handleUpdateLeg(leg.id, { entry_time: e.target.value })} style={{ ...inp2, width: "108px" }} />
+                                  <button onClick={() => handleUpdateLeg(leg.id, { entry_time: nowHHMM })} style={{ ...inp2, cursor: "pointer", fontSize: "11px" }}>Now</button>
+                                </div>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span style={{ color: "var(--ts-text-secondary)", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Exit</span>
+                                  {exitPassed && <span style={{ color: "var(--ts-loss)", background: "rgba(239,68,68,0.10)", borderRadius: "4px", fontSize: "9px", padding: "1px 5px", fontWeight: 700 }}>â¹ OUT</span>}
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <input type="time" value={leg.exit_time ?? "15:25"} onChange={e => handleUpdateLeg(leg.id, { exit_time: e.target.value })} style={{ ...inp2, width: "108px" }} />
+                                  <button onClick={() => handleUpdateLeg(leg.id, { exit_time: "15:25" })} style={{ ...inp2, cursor: "pointer", fontSize: "11px" }}>3:25</button>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div style={{ border: `1px solid ${(leg.sl_enabled ?? false) ? (legSlHit ? "var(--ts-loss)" : "rgba(245,158,11,0.4)") : "var(--ts-border)"}`, background: (leg.sl_enabled ?? false) ? (legSlHit ? "rgba(239,68,68,0.06)" : "rgba(245,158,11,0.04)") : "transparent", borderRadius: "10px" }} className="p-2.5">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span style={{ color: "var(--ts-text-secondary)", fontSize: "10px", fontWeight: 700, textTransform: "uppercase" }}>Stop Loss</span>
+                                  <label className="flex items-center gap-1 cursor-pointer">
+                                    <input type="checkbox" checked={leg.sl_enabled ?? false} onChange={e => handleUpdateLeg(leg.id, { sl_enabled: e.target.checked })} style={{ accentColor: "var(--ts-warning)", width: "13px", height: "13px" }} />
+                                    <span style={{ color: "var(--ts-muted)", fontSize: "10px" }}>On</span>
+                                  </label>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <input type="number" min={1} max={200} value={legSlPct} onChange={e => handleUpdateLeg(leg.id, { sl_pct: Math.max(1, Number(e.target.value)) })} disabled={!(leg.sl_enabled ?? false)} style={{ ...inp2, width: "52px", opacity: (leg.sl_enabled ?? false) ? 1 : 0.4 }} />
+                                  <span style={{ color: "var(--ts-muted)", fontSize: "11px" }}>%</span>
+                                </div>
+                                {(leg.sl_enabled ?? false) && (
+                                  <div style={{ color: legSlHit ? "var(--ts-loss)" : "var(--ts-warning)", fontFamily: "monospace", fontSize: "12px", fontWeight: 700, marginTop: "5px" }} className={legSlHit ? "animate-pulse" : ""}>
+                                    â‚¹{slPriceLeg.toFixed(2)}{legSlHit ? " âš " : ""}
+                                  </div>
+                                )}
+                              </div>
+                              <div style={{ border: `1px solid ${(leg.tp_enabled ?? false) ? (legTpHit ? "var(--ts-profit)" : "rgba(16,185,129,0.35)") : "var(--ts-border)"}`, background: (leg.tp_enabled ?? false) ? (legTpHit ? "rgba(16,185,129,0.08)" : "rgba(16,185,129,0.04)") : "transparent", borderRadius: "10px" }} className="p-2.5">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span style={{ color: "var(--ts-text-secondary)", fontSize: "10px", fontWeight: 700, textTransform: "uppercase" }}>Target</span>
+                                  <label className="flex items-center gap-1 cursor-pointer">
+                                    <input type="checkbox" checked={leg.tp_enabled ?? false} onChange={e => handleUpdateLeg(leg.id, { tp_enabled: e.target.checked })} style={{ accentColor: "var(--ts-profit)", width: "13px", height: "13px" }} />
+                                    <span style={{ color: "var(--ts-muted)", fontSize: "10px" }}>On</span>
+                                  </label>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <input type="number" min={1} max={500} value={legTpPct} onChange={e => handleUpdateLeg(leg.id, { tp_pct: Math.max(1, Number(e.target.value)) })} disabled={!(leg.tp_enabled ?? false)} style={{ ...inp2, width: "52px", opacity: (leg.tp_enabled ?? false) ? 1 : 0.4 }} />
+                                  <span style={{ color: "var(--ts-muted)", fontSize: "11px" }}>%</span>
+                                </div>
+                                {(leg.tp_enabled ?? false) && (
+                                  <div style={{ color: legTpHit ? "var(--ts-profit)" : "#a3e635", fontFamily: "monospace", fontSize: "12px", fontWeight: 700, marginTop: "5px" }} className={legTpHit ? "animate-pulse" : ""}>
+                                    â‚¹{tpPriceLeg.toFixed(2)}{legTpHit ? " âœ“" : ""}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Live total P&L footer */}
+              {isLive && (() => {
+                const totalPnl = legs.reduce((sum, l) => { const p = getLegPnl(data, l); return p !== null ? sum + p : sum; }, 0);
+                if (!legs.some(l => getLegPnl(data, l) !== null)) return null;
                 return (
-                  <div className={`flex items-center justify-between px-3 py-2 rounded-lg border font-mono ${
-                    total >= 0 ? "bg-green-950/40 border-green-800/50 text-green-300"
-                               : "bg-red-950/40 border-red-800/50 text-red-300"
-                  }`}>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Paper P&amp;L</span>
-                    <span className="text-sm font-extrabold">
-                      {total >= 0 ? "+" : ""}₹{Math.round(total).toLocaleString("en-IN")}
+                  <div style={{ borderTop: "1px solid var(--ts-border)", background: totalPnl >= 0 ? "rgba(16,185,129,0.06)" : "rgba(239,68,68,0.06)" }}
+                    className="px-4 py-2.5 flex items-center justify-between">
+                    <span style={{ color: "var(--ts-muted)", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>Paper P&L</span>
+                    <span style={{ color: totalPnl >= 0 ? "var(--ts-profit)" : "var(--ts-loss)", fontFamily: "monospace", fontSize: "17px", fontWeight: 900 }}>
+                      {totalPnl >= 0 ? "+" : ""}â‚¹{Math.round(totalPnl).toLocaleString("en-IN")}
                     </span>
                   </div>
                 );
               })()}
-
-              {/* Save strategy widget */}
-              <div className="border-t border-gray-850 pt-4 mt-auto space-y-3">
-                <h4 className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Save Strategy Workspace</h4>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Enter strategy name (e.g. Bull Call Spread)..."
-                    value={strategyName}
-                    onChange={(e) => setStrategyName(e.target.value)}
-                    className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500 flex-1"
-                  />
-                  <button
-                    onClick={handleSaveStrategy}
-                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg transition-colors shadow-md shadow-blue-900/10"
-                  >
-                    Save Strategy
-                  </button>
-                </div>
-              </div>
             </div>
 
-            {/* Right Column: Recharts Payoff Curve & Net Greeks (7 cols) */}
-            <div className="xl:col-span-7 flex flex-col gap-5">
-              
-              {/* Payoff line chart */}
-              <div className="bg-gray-950 border border-gray-850 rounded-xl p-4 h-[280px]">
+            {/* â”€â”€ RIGHT: Analysis (3/5) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            <div className="xl:col-span-3 flex flex-col">
+
+              {/* Stats bar */}
+              {payoff ? (
+                <div className="grid grid-cols-2 md:grid-cols-4" style={{ borderBottom: "1px solid var(--ts-border)" }}>
+                  {[
+                    { label: "Max Profit",  value: maxProfit === null ? "âˆž Unlimited" : `â‚¹${maxProfit.toLocaleString("en-IN")}`,                    color: "var(--ts-profit)",          pulse: false, sub: "" },
+                    { label: "Max Loss",    value: maxLoss   === null ? "âˆž Unlimited" : `â‚¹${Math.abs(maxLoss).toLocaleString("en-IN")}`,             color: "var(--ts-loss)",            pulse: maxLoss === null, sub: "" },
+                    { label: "Net Premium", value: `${payoff.net_premium >= 0 ? "+" : ""}â‚¹${Math.abs(payoff.net_premium).toLocaleString("en-IN")}`, color: payoff.net_premium >= 0 ? "var(--ts-profit)" : "var(--ts-text-secondary)", pulse: false, sub: payoff.net_premium >= 0 ? "CREDIT" : "DEBIT" },
+                    { label: "Theta / Day", value: `${payoff.net_greeks.theta >= 0 ? "+" : ""}â‚¹${Math.round(payoff.net_greeks.theta).toLocaleString("en-IN")}`, color: payoff.net_greeks.theta >= 0 ? "var(--ts-profit)" : "var(--ts-text-secondary)", pulse: false, sub: "" },
+                  ].map((cell, ci) => (
+                    <div key={cell.label} className="px-4 py-3"
+                      style={{ borderRight: ci < 3 ? "1px solid var(--ts-border)" : "none" }}>
+                      <div style={{ color: "var(--ts-muted)", fontSize: "10px", fontWeight: 600, marginBottom: "2px" }}>{cell.label}</div>
+                      <div style={{ color: cell.color, fontFamily: "monospace", fontSize: "15px", fontWeight: 800 }}
+                        className={cell.pulse ? "animate-pulse" : ""}>{cell.value}</div>
+                      {cell.sub && <div style={{ color: "var(--ts-muted)", fontSize: "10px", marginTop: "1px" }}>{cell.sub}</div>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ borderBottom: "1px solid var(--ts-border)", color: "var(--ts-muted)", fontSize: "13px" }}
+                  className="px-4 py-3">Loading analysisâ€¦</div>
+              )}
+
+              {/* Breakevens */}
+              {payoff && payoff.breakevens.length > 0 && (
+                <div style={{ borderBottom: "1px solid var(--ts-border)", background: "var(--ts-bg-base)" }}
+                  className="px-4 py-2 flex items-center gap-4 flex-wrap">
+                  <span style={{ color: "var(--ts-muted)", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>Breakeven</span>
+                  {payoff.breakevens.map((be, i) => {
+                    const pct = spotPrice ? ((be - spotPrice) / spotPrice * 100) : null;
+                    return (
+                      <span key={i} style={{ color: "var(--ts-warning)", fontFamily: "monospace", fontSize: "14px", fontWeight: 700 }}>
+                        {Math.round(be).toLocaleString("en-IN")}
+                        {pct !== null && (
+                          <span style={{ color: "var(--ts-muted)", fontSize: "11px", fontWeight: 400, marginLeft: "4px" }}>
+                            ({pct >= 0 ? "+" : ""}{pct.toFixed(1)}%)
+                          </span>
+                        )}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Payoff chart */}
+              <div className="p-3" style={{ minHeight: "280px" }}>
                 {payoffLoading && !payoff && (
-                  <div className="h-full flex items-center justify-center text-gray-500 text-xs animate-pulse">Calculating strategy curves...</div>
+                  <div className="h-full flex items-center justify-center animate-pulse" style={{ color: "var(--ts-muted)", minHeight: "200px" }}>
+                    Calculating curvesâ€¦
+                  </div>
                 )}
                 {payoff && (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={payoffChartData} margin={{ top: 14, right: 16, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 6" stroke="#1a2233" vertical={false} />
-                      <XAxis dataKey="spot" type="number" scale="linear" domain={["dataMin", "dataMax"]}
-                        allowDataOverflow stroke="#6b7280" fontSize={9}
-                        tickFormatter={(v) => (v / 1000).toFixed(1) + "k"} />
-                      <YAxis stroke="#6b7280" fontSize={9}
-                        tickFormatter={(v) => v >= 0 ? `+${(v/1000).toFixed(0)}k` : `${(v/1000).toFixed(0)}k`}
-                        width={42} />
-                      <Tooltip
-                        contentStyle={{ backgroundColor: "#030712", borderColor: "#1f2937", fontSize: 11 }}
-                        labelStyle={{ color: "#9ca3af", fontWeight: "bold" }}
-                        labelFormatter={(v: number) => `Spot: ₹${v.toLocaleString("en-IN")}`}
-                        formatter={(val: number, name: string) => {
-                          if (name === "profit_fill" || name === "loss_fill") return [null, null];
-                          return [`${val >= 0 ? "+" : ""}₹${Math.round(val).toLocaleString("en-IN")}`, name];
-                        }}
-                      />
-                      <Legend verticalAlign="top" height={22} iconType="circle" wrapperStyle={{ fontSize: "10px" }}
-                        payload={[
-                          { value: "On Expiry", type: "circle", id: "expiry_pnl", color: "#22c55e" },
-                          { value: "On Target Date", type: "circle", id: "today_pnl", color: "#60a5fa" },
-                        ]} />
-
-                      {/* Green fill: Area fills exactly under the profit triangle, above zero */}
-                      <Area type="linear" dataKey="profit_fill" fill="rgba(16,185,129,0.22)"
-                        stroke="none" isAnimationActive={false} legendType="none" activeDot={false} />
-                      {/* Red fill: Area fills exactly under the loss curve, below zero */}
-                      <Area type="linear" dataKey="loss_fill" fill="rgba(239,68,68,0.25)"
-                        stroke="none" isAnimationActive={false} legendType="none" activeDot={false} />
-
-                      {/* ±1SD safe zone band (≈68% of expected expiry outcomes) */}
-                      {sigma1 && spotPrice && (
-                        <ReferenceArea x1={spotPrice - sigma1} x2={spotPrice + sigma1}
-                          fill="#6366f1" fillOpacity={0.07} ifOverflow="extendDomain"
-                          label={{ value: "68% zone", fill: "#818cf8", fontSize: 8, position: "insideBottom" }} />
-                      )}
-
-                      {/* Zero line */}
-                      <ReferenceLine y={0} stroke="#4b5563" strokeWidth={1} />
-
-                      {/* Breakeven vertical lines (labels at the bottom to avoid SD overlap) */}
-                      {payoff.breakevens.map((be, i) => (
-                        <ReferenceLine key={`be-${i}`} x={be} stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="4 3"
-                          label={{ value: `BE ${Math.round(be).toLocaleString("en-IN")}`, fill: "#f59e0b", fontSize: 8,
-                            position: "insideBottom" }} />
-                      ))}
-
-                      {/* 2σ edges only (1σ shown as the shaded band above) — labels at top */}
-                      {sigma1 && spotPrice && (
-                        <>
+                  <>
+                    <ResponsiveContainer width="100%" height={260}>
+                      <ComposedChart data={payoffChartData} margin={{ top: 14, right: 16, left: 10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 6" stroke="#1a2233" vertical={false} />
+                        <XAxis dataKey="spot" type="number" scale="linear" domain={["dataMin","dataMax"]} allowDataOverflow
+                          stroke="#6b7280" fontSize={10} tickFormatter={(v: number) => (v / 1000).toFixed(1) + "k"} />
+                        <YAxis stroke="#6b7280" fontSize={10} width={44}
+                          tickFormatter={(v: number) => v >= 0 ? `+${(v/1000).toFixed(0)}k` : `${(v/1000).toFixed(0)}k`} />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: "#030712", borderColor: "#1f2937", fontSize: 12, borderRadius: "8px" }}
+                          labelStyle={{ color: "#9ca3af", fontWeight: "bold" }}
+                          labelFormatter={(v: number) => `Spot: â‚¹${v.toLocaleString("en-IN")}`}
+                          formatter={(val: number, name: string) => {
+                            if (name === "profit_fill" || name === "loss_fill") return [null, null];
+                            return [`${val >= 0 ? "+" : ""}â‚¹${Math.round(val).toLocaleString("en-IN")}`, name];
+                          }}
+                        />
+                        <Legend verticalAlign="top" height={22} iconType="circle" wrapperStyle={{ fontSize: "11px" }}
+                          payload={[
+                            { value: "On Expiry",      type: "circle", id: "expiry_pnl", color: "#22c55e" },
+                            { value: "On Target Date", type: "circle", id: "today_pnl",  color: "#60a5fa" },
+                          ]}
+                        />
+                        <Area type="linear" dataKey="profit_fill" fill="rgba(16,185,129,0.20)" stroke="none" isAnimationActive={false} legendType="none" activeDot={false} />
+                        <Area type="linear" dataKey="loss_fill"   fill="rgba(239,68,68,0.22)"  stroke="none" isAnimationActive={false} legendType="none" activeDot={false} />
+                        {sigma1 && spotPrice && (
+                          <ReferenceArea x1={spotPrice - sigma1} x2={spotPrice + sigma1}
+                            fill="#6366f1" fillOpacity={0.07} ifOverflow="extendDomain"
+                            label={{ value: "68% zone", fill: "#818cf8", fontSize: 8, position: "insideBottom" }} />
+                        )}
+                        <ReferenceLine y={0} stroke="#4b5563" strokeWidth={1} />
+                        {payoff.breakevens.map((be, i) => (
+                          <ReferenceLine key={`be-${i}`} x={be} stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="4 3"
+                            label={{ value: `BE ${Math.round(be).toLocaleString("en-IN")}`, fill: "#f59e0b", fontSize: 8, position: "insideBottom" }} />
+                        ))}
+                        {sigma1 && spotPrice && (<>
                           <ReferenceLine x={Math.round(spotPrice - sigma1 * 2)} stroke="#a78bfa" strokeDasharray="2 5" strokeWidth={1}
-                            label={{ value: "−2SD", fill: "#a78bfa", fontSize: 8, position: "insideTopLeft" }} />
+                            label={{ value: "âˆ’2SD", fill: "#a78bfa", fontSize: 8, position: "insideTopLeft" }} />
                           <ReferenceLine x={Math.round(spotPrice + sigma1 * 2)} stroke="#a78bfa" strokeDasharray="2 5" strokeWidth={1}
                             label={{ value: "+2SD", fill: "#a78bfa", fontSize: 8, position: "insideTopRight" }} />
-                        </>
-                      )}
-
-                      {/* Spot line */}
-                      {spotPrice && (
-                        <ReferenceLine x={spotPrice} stroke="#22c55e" strokeWidth={1.5} strokeDasharray="4 3"
-                          label={{ value: "SPOT", fill: "#22c55e", fontSize: 8, position: "top" }} />
-                      )}
-
-                      {/* SL / TP horizontal levels */}
-                      {slLevel !== null && (
-                        <ReferenceLine y={slLevel} stroke={slHit ? "#ef4444" : "#f97316"} strokeWidth={1.5} strokeDasharray="5 3"
-                          label={{ value: `SL ${slPct}%`, fill: slHit ? "#ef4444" : "#f97316", fontSize: 8, position: "insideLeft" }} />
-                      )}
-                      {tpLevel !== null && (
-                        <ReferenceLine y={tpLevel} stroke={tpHit ? "#22c55e" : "#a3e635"} strokeWidth={1.5} strokeDasharray="5 3"
-                          label={{ value: `TP ${tpPct}%`, fill: tpHit ? "#22c55e" : "#a3e635", fontSize: 8, position: "insideLeft" }} />
-                      )}
-
-                      {/* Projected P&L dot at current spot price */}
-                      {spotPrice && spotPnl !== null && (() => {
-                        const projPnl = Math.round(spotPnl + ivImpact);
-                        const color = projPnl >= 0 ? "#10b981" : "#ef4444";
-                        const label = `${projPnl >= 0 ? "+" : ""}₹${projPnl.toLocaleString("en-IN")}`;
-                        return (
-                          <ReferenceDot x={spotPrice} y={projPnl} r={5}
-                            fill={color} stroke="#111827" strokeWidth={2}
-                            label={{ value: label, position: "top", fill: color, fontSize: 10, fontWeight: "bold" }} />
-                        );
-                      })()}
-
-                      <Line type="linear" dataKey="expiry_pnl" name="On Expiry" stroke="#22c55e" strokeWidth={2.5} dot={false} isAnimationActive={false} connectNulls />
-                      <Line type="linear" dataKey="today_pnl" name="On Target Date" stroke="#60a5fa" strokeWidth={1.5} dot={false} strokeDasharray="5 3" isAnimationActive={false} connectNulls />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                )}
-                {payoff && sigma1 && (
-                  <div className="flex gap-3 mt-1 px-1 text-[9px] text-gray-600 flex-wrap">
-                    <span className="text-indigo-400">1SD ±{Math.round(sigma1).toLocaleString("en-IN")}</span>
-                    <span className="text-purple-400">2SD ±{Math.round(sigma1 * 2).toLocaleString("en-IN")}</span>
-                    {atmIv && <span>IV {atmIv.toFixed(1)}% · {Math.round(daysToExpiry)}DTE</span>}
-                  </div>
+                        </>)}
+                        {spotPrice && (
+                          <ReferenceLine x={spotPrice} stroke="#22c55e" strokeWidth={1.5} strokeDasharray="4 3"
+                            label={{ value: "SPOT", fill: "#22c55e", fontSize: 8, position: "top" }} />
+                        )}
+                        {slLevel !== null && (
+                          <ReferenceLine y={slLevel} stroke={slHit ? "#ef4444" : "#f97316"} strokeWidth={1.5} strokeDasharray="5 3"
+                            label={{ value: `SL ${slPct}%`, fill: slHit ? "#ef4444" : "#f97316", fontSize: 8, position: "insideLeft" }} />
+                        )}
+                        {tpLevel !== null && (
+                          <ReferenceLine y={tpLevel} stroke={tpHit ? "#22c55e" : "#a3e635"} strokeWidth={1.5} strokeDasharray="5 3"
+                            label={{ value: `TP ${tpPct}%`, fill: tpHit ? "#22c55e" : "#a3e635", fontSize: 8, position: "insideLeft" }} />
+                        )}
+                        {spotPrice && spotPnl !== null && (() => {
+                          const pp = Math.round(spotPnl + ivImpact);
+                          const col = pp >= 0 ? "#10b981" : "#ef4444";
+                          return (
+                            <ReferenceDot x={spotPrice} y={pp} r={5} fill={col} stroke="#111827" strokeWidth={2}
+                              label={{ value: `${pp >= 0 ? "+" : ""}â‚¹${pp.toLocaleString("en-IN")}`, position: "top", fill: col, fontSize: 10, fontWeight: "bold" }} />
+                          );
+                        })()}
+                        <Line type="linear" dataKey="expiry_pnl" name="On Expiry"      stroke="#22c55e" strokeWidth={2.5} dot={false} isAnimationActive={false} connectNulls />
+                        <Line type="linear" dataKey="today_pnl"  name="On Target Date" stroke="#60a5fa" strokeWidth={1.5} dot={false} strokeDasharray="5 3" isAnimationActive={false} connectNulls />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                    {sigma1 && (
+                      <div className="flex gap-4 mt-1 px-1 flex-wrap">
+                        <span style={{ color: "#818cf8", fontSize: "11px" }}>1SD Â±{Math.round(sigma1).toLocaleString("en-IN")}</span>
+                        <span style={{ color: "#a78bfa", fontSize: "11px" }}>2SD Â±{Math.round(sigma1 * 2).toLocaleString("en-IN")}</span>
+                        {atmIv && <span style={{ color: "var(--ts-muted)", fontSize: "11px" }}>IV {atmIv.toFixed(1)}% Â· {Math.round(daysToExpiry)}DTE</span>}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
-              {/* IV Simulator — below chart, affects blue "On Target Date" curve */}
+              {/* IV Simulator */}
               {payoff && (
-                <div className="bg-gray-950 border border-gray-800 rounded-lg px-4 py-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">IV Simulator</span>
-                    <div className="flex items-center gap-3">
+                <div style={{ borderTop: "1px solid var(--ts-border)", background: "var(--ts-bg-base)" }}
+                  className="px-4 py-3 space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span style={{ color: "var(--ts-muted)", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>IV Simulator</span>
+                    <div className="flex items-center gap-3 flex-wrap">
                       {atmIv && (
-                        <span className="text-[10px] text-gray-500 font-mono">
-                          ATM {atmIv.toFixed(1)}% → <span className={ivShift !== 0 ? "text-indigo-300 font-bold" : "text-gray-500"}>{(atmIv + ivShift).toFixed(1)}%</span>
+                        <span style={{ color: "var(--ts-muted)", fontFamily: "monospace", fontSize: "11px" }}>
+                          {atmIv.toFixed(1)}% â†’ <span style={{ color: ivShift !== 0 ? "#818cf8" : "var(--ts-muted)" }}>{(atmIv + ivShift).toFixed(1)}%</span>
                         </span>
                       )}
-                      <span className={`text-[11px] font-bold font-mono ${ivShift === 0 ? "text-gray-600" : ivImpact >= 0 ? "text-green-400" : "text-red-400"}`}>
-                        {ivShift === 0 ? "neutral" : `${ivShift > 0 ? "+" : ""}${ivShift}% → ${ivImpact >= 0 ? "+" : ""}₹${Math.abs(ivImpact).toLocaleString("en-IN")}`}
+                      <span style={{ color: ivShift === 0 ? "var(--ts-muted)" : ivImpact >= 0 ? "var(--ts-profit)" : "var(--ts-loss)", fontFamily: "monospace", fontSize: "11px", fontWeight: 700 }}>
+                        {ivShift === 0 ? "neutral" : `${ivShift > 0 ? "+" : ""}${ivShift}% â†’ ${ivImpact >= 0 ? "+" : ""}â‚¹${Math.abs(ivImpact).toLocaleString("en-IN")}`}
                       </span>
                       {ivShift !== 0 && (
-                        <button onClick={() => setIvShift(0)} className="text-[10px] text-gray-500 hover:text-gray-300 border border-gray-700 rounded px-1.5 py-0.5">Reset</button>
+                        <button onClick={() => setIvShift(0)}
+                          style={{ color: "var(--ts-muted)", border: "1px solid var(--ts-border)", borderRadius: "6px", background: "transparent", fontSize: "11px", padding: "2px 8px", cursor: "pointer" }}
+                          className="hover:text-white">Reset</button>
                       )}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-[9px] text-red-400 font-mono w-8 text-right">−50%</span>
-                    <input
-                      type="range" min={-50} max={50} step={1} value={ivShift}
-                      onChange={(e) => setIvShift(Number(e.target.value))}
-                      className="flex-1 accent-indigo-500 h-1.5 bg-gray-800 rounded cursor-pointer"
-                    />
-                    <span className="text-[9px] text-green-400 font-mono w-8">+50%</span>
+                    <span style={{ color: "var(--ts-loss)", fontFamily: "monospace", fontSize: "11px", width: "32px", textAlign: "right" }}>âˆ’50%</span>
+                    <input type="range" min={-50} max={50} step={1} value={ivShift} onChange={e => setIvShift(Number(e.target.value))}
+                      className="flex-1 h-1.5 rounded cursor-pointer" style={{ accentColor: "#6366f1" }} />
+                    <span style={{ color: "var(--ts-profit)", fontFamily: "monospace", fontSize: "11px", width: "32px" }}>+50%</span>
                   </div>
-                  <div className="flex gap-1.5 justify-center">
+                  <div className="flex gap-1.5 justify-center flex-wrap">
                     {[-20, -10, -5, 5, 10, 20].map(v => (
                       <button key={v} onClick={() => setIvShift(v)}
-                        className={`text-[9px] px-2 py-0.5 rounded border font-mono transition-colors ${
-                          ivShift === v ? "bg-indigo-900/60 border-indigo-700 text-indigo-300"
-                                        : "border-gray-800 text-gray-600 hover:text-gray-400 hover:border-gray-700"
-                        }`}>
+                        style={{
+                          background: ivShift === v ? "rgba(99,102,241,0.18)" : "transparent",
+                          color: ivShift === v ? "#818cf8" : "var(--ts-muted)",
+                          border: `1px solid ${ivShift === v ? "#6366f1" : "var(--ts-border)"}`,
+                          borderRadius: "6px", fontSize: "11px", padding: "2px 8px",
+                          fontFamily: "monospace", cursor: "pointer",
+                        }} className="hover:text-white transition-colors">
                         {v > 0 ? "+" : ""}{v}%
                       </button>
                     ))}
@@ -1935,132 +1971,73 @@ export default function OptionsChain() {
                 </div>
               )}
 
-              {/* Payoff Metrics & Greeks grid */}
+              {/* Greeks + Paper Trade */}
               {payoff && (
-                <div className="space-y-4">
-                  {/* Summary Cards */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="bg-gray-950 border border-gray-850 p-3 rounded-lg">
-                      <div className="text-[9px] text-gray-500 uppercase tracking-wider font-bold">Max Profit</div>
-                      <div className={`text-sm font-extrabold font-mono mt-0.5 ${maxProfit === null ? "text-green-400" : maxProfit >= 0 ? "text-green-400" : "text-red-400"}`}>
-                        {maxProfit === null ? "Unlimited" : `₹${maxProfit.toLocaleString("en-IN")}`}
-                      </div>
-                    </div>
-                    <div className="bg-gray-950 border border-gray-850 p-3 rounded-lg">
-                      <div className="text-[9px] text-gray-500 uppercase tracking-wider font-bold">Max Loss</div>
-                      <div className={`text-sm font-extrabold font-mono mt-0.5 ${maxLoss === null ? "text-red-400 animate-pulse" : maxLoss >= 0 ? "text-green-400" : "text-red-400"}`}>
-                        {maxLoss === null ? "Unlimited" : `₹${maxLoss.toLocaleString("en-IN")}`}
-                      </div>
-                    </div>
-                    <div className="bg-gray-950 border border-gray-850 p-3 rounded-lg">
-                      <div className="text-[9px] text-gray-500 uppercase tracking-wider font-bold">Net Premium</div>
-                      <div className={`text-sm font-extrabold font-mono mt-0.5 ${payoff.net_premium >= 0 ? "text-green-400" : "text-red-400"}`}>
-                        {payoff.net_premium >= 0 ? `+₹${payoff.net_premium.toLocaleString()}` : `-₹${Math.abs(payoff.net_premium).toLocaleString()}`}
-                      </div>
-                    </div>
-                    <div className="bg-gray-950 border border-gray-850 p-3 rounded-lg flex flex-col justify-center">
-                      <div className="text-[9px] text-gray-500 uppercase tracking-wider font-bold">Breakevens</div>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {payoff.breakevens.map(b => (
-                          <span key={b} className="text-[10px] font-bold font-mono bg-gray-900 border border-gray-800 px-1 py-0.2 rounded text-gray-300">{Math.round(b)}</span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Greeks Row */}
-                  <div className="bg-gray-950 border border-gray-850 rounded-xl p-4">
-                    <h4 className="text-[10px] text-gray-550 uppercase tracking-wider font-bold mb-2.5">Portfolio Greeks (Combined)</h4>
-                    <div className="grid grid-cols-4 gap-2 font-mono">
+                <div style={{ borderTop: "1px solid var(--ts-border)", background: "var(--ts-bg-base)" }}
+                  className="grid grid-cols-1 md:grid-cols-2">
+                  {/* Greeks */}
+                  <div style={{ borderRight: "1px solid var(--ts-border)" }} className="p-3">
+                    <div style={{ color: "var(--ts-muted)", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>Greeks</div>
+                    <div className="grid grid-cols-2 gap-2">
                       {[
-                        { label: "Delta", val: payoff.net_greeks.delta.toFixed(3), color: payoff.net_greeks.delta >= 0 ? "text-green-400" : "text-red-400" },
-                        { label: "Gamma", val: payoff.net_greeks.gamma.toFixed(5), color: "text-gray-300" },
-                        { label: "Theta/day", val: `₹${payoff.net_greeks.theta.toFixed(0)}`, color: payoff.net_greeks.theta >= 0 ? "text-green-400" : "text-red-400" },
-                        { label: "Vega/1%", val: `₹${payoff.net_greeks.vega.toFixed(0)}`, color: payoff.net_greeks.vega >= 0 ? "text-green-400" : "text-red-400" },
+                        { label: "Delta",    val: payoff.net_greeks.delta.toFixed(3), color: payoff.net_greeks.delta >= 0 ? "var(--ts-profit)" : "var(--ts-loss)" },
+                        { label: "Gamma",    val: payoff.net_greeks.gamma.toFixed(5), color: "var(--ts-text)" },
+                        { label: "Theta",    val: `â‚¹${Math.round(payoff.net_greeks.theta)}`,  color: payoff.net_greeks.theta >= 0 ? "var(--ts-profit)" : "var(--ts-loss)" },
+                        { label: "Vega/1%", val: `â‚¹${Math.round(payoff.net_greeks.vega)}`,   color: payoff.net_greeks.vega  >= 0 ? "var(--ts-profit)" : "var(--ts-loss)" },
                       ].map(g => (
-                        <div key={g.label} className="bg-gray-900/60 p-2 rounded border border-gray-850">
-                          <div className="text-[9px] text-gray-500">{g.label}</div>
-                          <div className={`text-xs font-bold mt-0.5 ${g.color}`}>{g.val}</div>
+                        <div key={g.label} style={{ background: "var(--ts-bg-elevated)", borderRadius: "8px" }} className="px-2 py-2">
+                          <div style={{ color: "var(--ts-muted)", fontSize: "10px" }}>{g.label}</div>
+                          <div style={{ color: g.color, fontFamily: "monospace", fontSize: "14px", fontWeight: 700 }}>{g.val}</div>
                         </div>
                       ))}
                     </div>
                   </div>
-
-                  {/* Paper Trade — SL / TP Monitor */}
-                  <div className="bg-gray-950 border border-gray-800 rounded-xl p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Paper Trade Monitor</h4>
-                      {/* Live status badge */}
+                  {/* Paper Trade */}
+                  <div className="p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span style={{ color: "var(--ts-muted)", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>Paper Trade</span>
                       {(slHit || tpHit) && (
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold animate-pulse ${tpHit ? "bg-green-900/60 text-green-300 border border-green-700/50" : "bg-red-900/60 text-red-300 border border-red-700/50"}`}>
-                          {tpHit ? "TARGET HIT ✓" : "SL HIT ✗"}
+                        <span style={{ color: tpHit ? "var(--ts-profit)" : "var(--ts-loss)", background: tpHit ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)", borderRadius: "4px", fontSize: "10px", padding: "2px 7px", fontWeight: 800 }} className="animate-pulse">
+                          {tpHit ? "TP âœ“" : "SL âœ—"}
                         </span>
                       )}
-                      {!slHit && !tpHit && (slEnabled || tpEnabled) && spotPnl !== null && (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-900/30 text-blue-300 border border-blue-700/30">RUNNING</span>
-                      )}
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      {/* Stop Loss */}
-                      <div className={`p-3 rounded-lg border ${slEnabled ? (slHit ? "border-red-600/60 bg-red-950/30" : "border-orange-700/40 bg-orange-950/10") : "border-gray-800 bg-gray-900/30"}`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Stop Loss</span>
-                          <label className="flex items-center gap-1 cursor-pointer">
-                            <input type="checkbox" checked={slEnabled} onChange={e => setSlEnabled(e.target.checked)}
-                              className="accent-orange-500 w-3 h-3" />
-                            <span className="text-[9px] text-gray-500">Enable</span>
+                    <div className="space-y-2">
+                      <div style={{ border: `1px solid ${slEnabled ? (slHit ? "var(--ts-warning)" : "rgba(245,158,11,0.3)") : "var(--ts-border)"}`, borderRadius: "8px" }} className="px-3 py-2">
+                        <div className="flex items-center justify-between">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={slEnabled} onChange={e => setSlEnabled(e.target.checked)} style={{ accentColor: "var(--ts-warning)", width: "13px", height: "13px" }} />
+                            <span style={{ color: "var(--ts-text-secondary)", fontSize: "12px" }}>Stop Loss</span>
                           </label>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input type="number" min={1} max={200} value={slPct}
-                            onChange={e => setSlPct(Math.max(1, Number(e.target.value)))}
-                            disabled={!slEnabled}
-                            className="w-14 bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5 text-[11px] text-white font-mono text-right focus:outline-none focus:border-orange-500 disabled:opacity-40" />
-                          <span className="text-[10px] text-gray-500">% of premium</span>
-                        </div>
-                        {slEnabled && slLevel !== null && (
-                          <div className={`mt-1 text-[10px] font-mono font-bold ${slHit ? "text-red-400" : "text-orange-400"}`}>
-                            = ₹{Math.abs(slLevel).toLocaleString("en-IN")}
+                          <div className="flex items-center gap-1.5">
+                            <input type="number" min={1} max={200} value={slPct} onChange={e => setSlPct(Math.max(1, Number(e.target.value)))} disabled={!slEnabled}
+                              style={{ background: "var(--ts-bg-elevated)", color: "var(--ts-text)", border: "1px solid var(--ts-border)", borderRadius: "6px", width: "46px", textAlign: "right", fontFamily: "monospace", fontSize: "12px", padding: "2px 6px", outline: "none", opacity: slEnabled ? 1 : 0.4 }} />
+                            <span style={{ color: "var(--ts-muted)", fontSize: "11px" }}>%</span>
+                            {slEnabled && slLevel !== null && <span style={{ color: slHit ? "var(--ts-warning)" : "var(--ts-text-secondary)", fontFamily: "monospace", fontSize: "11px", fontWeight: 700 }}>â‚¹{Math.abs(slLevel).toLocaleString("en-IN")}</span>}
                           </div>
-                        )}
+                        </div>
                       </div>
-                      {/* Take Profit */}
-                      <div className={`p-3 rounded-lg border ${tpEnabled ? (tpHit ? "border-green-600/60 bg-green-950/30" : "border-lime-700/40 bg-lime-950/10") : "border-gray-800 bg-gray-900/30"}`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Take Profit</span>
-                          <label className="flex items-center gap-1 cursor-pointer">
-                            <input type="checkbox" checked={tpEnabled} onChange={e => setTpEnabled(e.target.checked)}
-                              className="accent-green-500 w-3 h-3" />
-                            <span className="text-[9px] text-gray-500">Enable</span>
+                      <div style={{ border: `1px solid ${tpEnabled ? (tpHit ? "var(--ts-profit)" : "rgba(16,185,129,0.3)") : "var(--ts-border)"}`, borderRadius: "8px" }} className="px-3 py-2">
+                        <div className="flex items-center justify-between">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={tpEnabled} onChange={e => setTpEnabled(e.target.checked)} style={{ accentColor: "var(--ts-profit)", width: "13px", height: "13px" }} />
+                            <span style={{ color: "var(--ts-text-secondary)", fontSize: "12px" }}>Take Profit</span>
                           </label>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input type="number" min={1} max={500} value={tpPct}
-                            onChange={e => setTpPct(Math.max(1, Number(e.target.value)))}
-                            disabled={!tpEnabled}
-                            className="w-14 bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5 text-[11px] text-white font-mono text-right focus:outline-none focus:border-green-500 disabled:opacity-40" />
-                          <span className="text-[10px] text-gray-500">% of premium</span>
-                        </div>
-                        {tpEnabled && tpLevel !== null && (
-                          <div className={`mt-1 text-[10px] font-mono font-bold ${tpHit ? "text-green-400" : "text-lime-400"}`}>
-                            = ₹{tpLevel.toLocaleString("en-IN")}
+                          <div className="flex items-center gap-1.5">
+                            <input type="number" min={1} max={500} value={tpPct} onChange={e => setTpPct(Math.max(1, Number(e.target.value)))} disabled={!tpEnabled}
+                              style={{ background: "var(--ts-bg-elevated)", color: "var(--ts-text)", border: "1px solid var(--ts-border)", borderRadius: "6px", width: "46px", textAlign: "right", fontFamily: "monospace", fontSize: "12px", padding: "2px 6px", outline: "none", opacity: tpEnabled ? 1 : 0.4 }} />
+                            <span style={{ color: "var(--ts-muted)", fontSize: "11px" }}>%</span>
+                            {tpEnabled && tpLevel !== null && <span style={{ color: tpHit ? "var(--ts-profit)" : "var(--ts-text-secondary)", fontFamily: "monospace", fontSize: "11px", fontWeight: 700 }}>â‚¹{Math.abs(tpLevel).toLocaleString("en-IN")}</span>}
                           </div>
-                        )}
+                        </div>
                       </div>
                     </div>
-                    {/* Current P&L vs levels */}
                     {spotPnl !== null && (slEnabled || tpEnabled) && (
-                      <div className="flex items-center gap-3 pt-1 border-t border-gray-800 text-[10px] font-mono">
-                        <span className="text-gray-500">Live P&amp;L:</span>
-                        <span className={`font-bold ${spotPnl >= 0 ? "text-green-400" : "text-red-400"}`}>
-                          {spotPnl >= 0 ? "+" : ""}₹{Math.round(spotPnl).toLocaleString("en-IN")}
+                      <div style={{ borderTop: "1px solid var(--ts-border)", marginTop: "8px", paddingTop: "6px" }} className="flex items-center gap-2">
+                        <span style={{ color: "var(--ts-muted)", fontFamily: "monospace", fontSize: "11px" }}>P&L:</span>
+                        <span style={{ color: spotPnl >= 0 ? "var(--ts-profit)" : "var(--ts-loss)", fontFamily: "monospace", fontSize: "13px", fontWeight: 800 }}>
+                          {spotPnl >= 0 ? "+" : ""}â‚¹{Math.round(spotPnl).toLocaleString("en-IN")}
                         </span>
-                        {slEnabled && slLevel !== null && (
-                          <span className="text-gray-600">SL at ₹{Math.abs(slLevel).toLocaleString("en-IN")} ({((1 - (slLevel / (spotPnl || -1))) * 100).toFixed(0)}% away)</span>
-                        )}
-                        {tpEnabled && tpLevel !== null && (
-                          <span className="text-gray-600">TP at ₹{tpLevel.toLocaleString("en-IN")}</span>
-                        )}
                       </div>
                     )}
                   </div>
