@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  getFlowDates, getDots, getOiExpiries, getOiStrikes, getOiAnalysis, getOiTools, getFlowLive,
+  getFlowDates, getDots, getOiExpiries, getOiStrikes, getOiAnalysis, getOiTools, getFlowLive, getFiiDii,
 } from "../api";
+import type { FiiDiiDay } from "../api";
 import LWChart from "./LWChart";
 import type {
   DotsResponse, OiAnalysisResponse, OiToolsResponse, OiContract, FlowLiveResponse,
 } from "../types";
 
-type Sub = "dots" | "oi" | "stats" | "spurt" | "bigmove" | "trending" | "active" | "risk";
+type Sub = "dots" | "oi" | "stats" | "spurt" | "bigmove" | "trending" | "active" | "risk" | "fii";
 type Mode = "live" | "historical";
 
 const SUBS: [Sub, string][] = [
@@ -19,13 +20,11 @@ const SUBS: [Sub, string][] = [
   ["trending", "Trending OI"],
   ["active", "Active Strikes"],
   ["risk", "Risk Calc"],
+  ["fii", "FII DII Details"],
 ];
 
 const TOOL_SUBS: Sub[] = ["stats", "spurt", "bigmove", "trending", "active"];
 const needsExpiry = (s: Sub) => s === "oi" || TOOL_SUBS.includes(s);
-
-// Live mode collapses to the institutional dashboard + risk calc.
-const LIVE_SUBS: [Sub, string][] = [["dots", "Live OI Flow"], ["risk", "Risk Calc"]];
 
 // Current NSE lot sizes (revised 1 Jan 2026): NIFTY 65, BANKNIFTY 30
 const LOT: Record<string, number> = { NIFTY: 65, BANKNIFTY: 30, FINNIFTY: 60, MIDCPNIFTY: 120 };
@@ -67,7 +66,7 @@ function chg(n: number) {
 
 export default function FlowMatrix() {
   const [sub, setSub] = useState<Sub>("dots");
-  const [mode, setMode] = useState<Mode>("historical");
+  const [mode, setMode] = useState<Mode>("live");
   const [underlying, setUnderlying] = useState("BANKNIFTY");
   const [dates, setDates] = useState<string[]>([]);
   const [date, setDate] = useState("");
@@ -143,22 +142,20 @@ export default function FlowMatrix() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-bold tracking-tight"><span className="text-blue-400">Flow</span>Matrix</h2>
+          <h2 className="text-lg font-bold tracking-tight"><span className="text-blue-400">OI</span> Matrix</h2>
           <span className="text-xs text-gray-500">OI confluence &amp; interpretation engine</span>
         </div>
         <div className="flex flex-wrap bg-gray-950 rounded-lg p-0.5 border border-gray-800">
-          {/* Live mode = single institutional OI-flow dashboard; the per-tool tabs
-              are historical-OI tools that need intraday OI the platform lacks. */}
-          {(mode === "live" ? LIVE_SUBS : SUBS).map(([id, label]) => (
+          {SUBS.map(([id, label]) => (
             <button key={id} onClick={() => setSub(id)}
-              className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${(mode === "live" ? (id === "risk" ? sub === "risk" : sub !== "risk") : sub === id) ? "bg-blue-600 text-white" : "text-gray-400 hover:text-gray-200"}`}>
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${sub === id ? "bg-blue-600 text-white" : "text-gray-400 hover:text-gray-200"}`}>
               {label}
             </button>
           ))}
         </div>
       </div>
 
-      {sub !== "risk" && (
+      {sub !== "risk" && sub !== "fii" && (
         <div className="flex items-end gap-4 flex-wrap bg-gray-900 border border-gray-800 rounded-xl p-3">
           <div className="flex flex-col gap-1">
             <label className="text-[10px] uppercase tracking-wider text-gray-500">Mode</label>
@@ -169,14 +166,15 @@ export default function FlowMatrix() {
             </div>
           </div>
           <Field label="Name"><select className={inp} value={underlying} onChange={(e) => setUnderlying(e.target.value)}><option>BANKNIFTY</option><option>NIFTY</option></select></Field>
-          {mode === "historical" && <>
-            <Field label="Date"><select className={inp} value={date} onChange={(e) => setDate(e.target.value)}>{dates.length === 0 && <option>—</option>}{dates.map((d) => <option key={d}>{d}</option>)}</select></Field>
+          {/* Historical controls — also available in live mode for the OI tool tabs */}
+          {(mode === "historical" || (mode === "live" && sub !== "dots")) && <>
+            {mode === "historical" && <Field label="Date"><select className={inp} value={date} onChange={(e) => setDate(e.target.value)}>{dates.length === 0 && <option>—</option>}{dates.map((d) => <option key={d}>{d}</option>)}</select></Field>}
             {needsExpiry(sub) && <Field label="Expiry"><select className={inp} value={expiry} onChange={(e) => setExpiry(e.target.value)}>{expiries.length === 0 && <option>—</option>}{expiries.map((x) => <option key={x}>{x}</option>)}</select></Field>}
             {sub === "oi" && <Field label="Strike"><select className={inp} value={strike} onChange={(e) => setStrike(Number(e.target.value))}>{strikes.length === 0 && <option>—</option>}{strikes.map((s) => <option key={s} value={s}>{s}</option>)}</select></Field>}
             <Field label="Interval"><select className={inp} value={interval} onChange={(e) => setIntv(Number(e.target.value))}>{INTERVALS.map((m) => <option key={m} value={m}>{m} min</option>)}</select></Field>
-            <button onClick={go} disabled={loading || !date} className="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-bold">{loading ? "Loading…" : "Go"}</button>
+            <button onClick={go} disabled={loading || (!date && mode === "historical")} className="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-sm font-bold">{loading ? "Loading…" : "Go"}</button>
           </>}
-          {mode === "live" && (
+          {mode === "live" && sub === "dots" && (
             <div className="flex items-center gap-2 px-2 py-2 self-center">
               <span className="relative flex h-2.5 w-2.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" /></span>
               <span className="text-xs text-emerald-400 font-semibold">LIVE · auto-refresh 4s · nearest expiry</span>
@@ -199,23 +197,20 @@ export default function FlowMatrix() {
 
       {err && <div className="text-sm text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">{err}</div>}
 
-      {/* LIVE mode: institutional OI-flow dashboard (real-time, polls /flow/live) */}
-      {mode === "live" && sub !== "risk" && <LiveFlow data={liveFlow} err={liveErr} />}
+      {/* Connecting Dots: live = institutional OI-flow dashboard; historical = confluence grid */}
+      {sub === "dots" && mode === "live" && <LiveFlow data={liveFlow} err={liveErr} />}
+      {sub === "dots" && mode === "historical" && <DotsTable data={dots} />}
 
-      {/* HISTORICAL mode: per-interval confluence + OI tools (DB-backed) */}
-      {mode === "historical" && (
-        <>
-          {sub === "dots" && <DotsTable data={dots} />}
-          {sub === "oi" && <OiTable data={oi} />}
-          {sub === "stats" && <StatsView data={tools} />}
-          {sub === "spurt" && <ContractTable data={tools} which="spurt" title="OI Spurt — biggest last-bucket OI jumps" col="oi_chg_bucket" colLabel="Bucket OI Chg" />}
-          {sub === "bigmove" && <ContractTable data={tools} which="big_movement" title="Big OI Movement — largest day-cumulative OI change" col="oi_chg_day" colLabel="Day OI Chg" />}
-          {sub === "trending" && <TrendingView data={tools} />}
-          {sub === "active" && <ActiveView data={tools} />}
-        </>
-      )}
+      {/* OI tools — available in both modes; historical picks explicit date/expiry */}
+      {sub === "oi" && <OiTable data={oi} />}
+      {sub === "stats" && <StatsView data={tools} />}
+      {sub === "spurt" && <ContractTable data={tools} which="spurt" title="OI Spurt — biggest last-bucket OI jumps" col="oi_chg_bucket" colLabel="Bucket OI Chg" />}
+      {sub === "bigmove" && <ContractTable data={tools} which="big_movement" title="Big OI Movement — largest day-cumulative OI change" col="oi_chg_day" colLabel="Day OI Chg" />}
+      {sub === "trending" && <TrendingView data={tools} />}
+      {sub === "active" && <ActiveView data={tools} />}
 
       {sub === "risk" && <RiskCalc lot={LOT[underlying] ?? 65} underlying={underlying} />}
+      {sub === "fii" && <FiiDiiView />}
     </div>
   );
 }
@@ -592,4 +587,139 @@ function Stat({ label, v, tone }: { label: string; v: React.ReactNode; tone: str
 
 function Empty({ text }: { text: string }) {
   return <div className="h-64 flex items-center justify-center text-gray-600 text-sm border border-dashed border-gray-800 rounded-xl">{text}</div>;
+}
+
+// ── FII / DII Details ────────────────────────────────────────────────────────
+const CLIENT_COLOR: Record<string, string> = {
+  FII:    "text-blue-400",
+  DII:    "text-emerald-400",
+  Pro:    "text-amber-400",
+  Client: "text-gray-300",
+};
+const CLIENT_BG: Record<string, string> = {
+  FII:    "bg-blue-600/20 border-blue-600/30",
+  DII:    "bg-emerald-600/20 border-emerald-600/30",
+  Pro:    "bg-amber-600/20 border-amber-600/30",
+  Client: "bg-gray-800 border-gray-700",
+};
+const ORDER = ["FII", "DII", "Pro", "Client"];
+
+function netFmt(long: number | null, short: number | null) {
+  if (long == null || short == null) return <span className="text-gray-600">—</span>;
+  const net = long - short;
+  return (
+    <span className={net > 0 ? "text-emerald-400 font-bold" : net < 0 ? "text-red-400 font-bold" : "text-gray-400"}>
+      {net > 0 ? "+" : ""}{net.toLocaleString("en-IN")}
+    </span>
+  );
+}
+
+function FiiDiiView() {
+  const [data, setData] = useState<FiiDiiDay[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [days, setDays] = useState(30);
+
+  useEffect(() => {
+    setLoading(true); setErr(null);
+    getFiiDii(days)
+      .then(d => { setData(d); setLoading(false); })
+      .catch(e => { setErr(e.message); setLoading(false); });
+  }, [days]);
+
+  if (loading) return <Empty text="Loading FII/DII data…" />;
+  if (err) return <div className="text-sm text-red-400 bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">{err}</div>;
+  if (!data.length) return (
+    <div className="space-y-3">
+      <Empty text="No FII/DII data in DB yet." />
+      <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 text-xs text-gray-400 space-y-1">
+        <div className="font-bold text-gray-300 mb-2">Fetch NSE participant-wise F&O data on VPS:</div>
+        <code className="block bg-gray-950 rounded px-3 py-2 text-emerald-400">
+          .venv/bin/python scripts/fetch_fii_dii.py --from 2026-01-01 --to 2026-06-17
+        </code>
+        <div className="text-gray-500 mt-1">Schedule via cron after 18:00 IST daily (Mon–Fri):</div>
+        <code className="block bg-gray-950 rounded px-3 py-2 text-emerald-400">
+          0 18 * * 1-5 cd /opt/trading &amp;&amp; .venv/bin/python scripts/fetch_fii_dii.py &gt;&gt; logs/fii_dii.log 2&gt;&amp;1
+        </code>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-bold text-gray-200">FII / DII Participant-wise F&amp;O Activity</h3>
+          <p className="text-[10px] text-gray-500 mt-0.5">Source: NSE participant OI data · End-of-day · Index F&amp;O only</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-gray-500">Show</span>
+          {[7, 15, 30, 60].map(d => (
+            <button key={d} onClick={() => setDays(d)}
+              className={`px-2.5 py-1 rounded text-xs font-semibold ${days === d ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-400 hover:text-gray-200"}`}>
+              {d}d
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {data.map(day => {
+        const sorted = [...day.participants].sort(
+          (a, b) => ORDER.indexOf(a.client_type) - ORDER.indexOf(b.client_type)
+        );
+        return (
+          <div key={day.date} className="border border-gray-800 rounded-xl overflow-hidden">
+            <div className="bg-gray-900 px-3 py-2 flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-300">{day.date}</span>
+              <span className="text-[10px] text-gray-500 uppercase tracking-wider">Index F&amp;O Participant OI</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-900/60 text-gray-500 uppercase tracking-wider">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Client</th>
+                    <th className="px-3 py-2 text-right">Fut Long</th>
+                    <th className="px-3 py-2 text-right">Fut Short</th>
+                    <th className="px-3 py-2 text-right">Fut Net</th>
+                    <th className="px-3 py-2 text-right">Call Long</th>
+                    <th className="px-3 py-2 text-right">Call Short</th>
+                    <th className="px-3 py-2 text-right">Put Long</th>
+                    <th className="px-3 py-2 text-right">Put Short</th>
+                    <th className="px-3 py-2 text-right">Opt Net</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map(p => {
+                    const optNet = (p.opt_put_long ?? 0) + (p.opt_call_long ?? 0)
+                                 - (p.opt_put_short ?? 0) - (p.opt_call_short ?? 0);
+                    return (
+                      <tr key={p.client_type} className="border-t border-gray-800/60">
+                        <td className="px-3 py-2">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${CLIENT_BG[p.client_type] ?? CLIENT_BG.Client} ${CLIENT_COLOR[p.client_type] ?? "text-gray-300"}`}>
+                            {p.client_type}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right text-gray-300">{p.fut_idx_long?.toLocaleString("en-IN") ?? "—"}</td>
+                        <td className="px-3 py-2 text-right text-gray-300">{p.fut_idx_short?.toLocaleString("en-IN") ?? "—"}</td>
+                        <td className="px-3 py-2 text-right">{netFmt(p.fut_idx_long, p.fut_idx_short)}</td>
+                        <td className="px-3 py-2 text-right text-gray-400">{p.opt_call_long?.toLocaleString("en-IN") ?? "—"}</td>
+                        <td className="px-3 py-2 text-right text-gray-400">{p.opt_call_short?.toLocaleString("en-IN") ?? "—"}</td>
+                        <td className="px-3 py-2 text-right text-gray-400">{p.opt_put_long?.toLocaleString("en-IN") ?? "—"}</td>
+                        <td className="px-3 py-2 text-right text-gray-400">{p.opt_put_short?.toLocaleString("en-IN") ?? "—"}</td>
+                        <td className="px-3 py-2 text-right">
+                          <span className={optNet > 0 ? "text-emerald-400 font-bold" : optNet < 0 ? "text-red-400 font-bold" : "text-gray-500"}>
+                            {optNet > 0 ? "+" : ""}{optNet.toLocaleString("en-IN")}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }

@@ -85,6 +85,20 @@ def init_db(con: duckdb.DuckDBPyConnection | None = None) -> None:
         );
         """
     )
+    con.execute(
+        """
+        CREATE TABLE IF NOT EXISTS fii_dii_daily (
+            date            DATE    NOT NULL,
+            client_type     VARCHAR NOT NULL,
+            fut_idx_long    INTEGER,
+            fut_idx_short   INTEGER,
+            opt_call_long   INTEGER,
+            opt_call_short  INTEGER,
+            opt_put_long    INTEGER,
+            opt_put_short   INTEGER
+        );
+        """
+    )
 
 
 _INDEXED = False
@@ -226,6 +240,58 @@ def list_expiries(underlying: str) -> list[date]:
     try:
         rows = cur.execute(sql, [underlying]).fetchall()
         return [r[0] for r in rows]
+    finally:
+        cur.close()
+
+
+def write_fii_dii(rows: list[dict]) -> int:
+    """Insert FII/DII daily rows. Dedupes by (date, client_type). Returns rows written."""
+    if not rows:
+        return 0
+    con = db()
+    written = 0
+    for r in rows:
+        existing = con.execute(
+            "SELECT count(*) FROM fii_dii_daily WHERE date=? AND client_type=?",
+            [r["date"], r["client_type"]],
+        ).fetchone()[0]
+        if existing:
+            continue
+        con.execute(
+            """INSERT INTO fii_dii_daily
+               (date, client_type, fut_idx_long, fut_idx_short,
+                opt_call_long, opt_call_short, opt_put_long, opt_put_short)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            [r["date"], r["client_type"], r.get("fut_idx_long"), r.get("fut_idx_short"),
+             r.get("opt_call_long"), r.get("opt_call_short"),
+             r.get("opt_put_long"), r.get("opt_put_short")],
+        )
+        written += 1
+    return written
+
+
+def read_fii_dii(days: int = 30) -> list[dict]:
+    """Return last N calendar days of FII/DII data, newest first."""
+    cur = db().cursor()
+    try:
+        rows = cur.execute(
+            """SELECT date, client_type, fut_idx_long, fut_idx_short,
+                      opt_call_long, opt_call_short, opt_put_long, opt_put_short
+               FROM fii_dii_daily
+               WHERE date >= current_date - INTERVAL (?) DAY
+               ORDER BY date DESC, client_type""",
+            [days],
+        ).fetchall()
+        return [
+            {
+                "date": r[0].isoformat() if hasattr(r[0], "isoformat") else str(r[0]),
+                "client_type": r[1],
+                "fut_idx_long": r[2], "fut_idx_short": r[3],
+                "opt_call_long": r[4], "opt_call_short": r[5],
+                "opt_put_long": r[6], "opt_put_short": r[7],
+            }
+            for r in rows
+        ]
     finally:
         cur.close()
 

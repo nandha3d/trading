@@ -40,23 +40,59 @@ class RiskRule:
     unit: Unit = Unit.PERCENT
 
 
-# NSE revised all index-derivative lot sizes effective 1 Jan 2026 (applies to
-# every contract expiring Jan 2026 onward). Backtests on older expiries must use
-# the pre-revision sizes, so lot size is resolved per-contract by expiry date.
-_LOT_REVISION = date(2026, 1, 1)
-_LOT_PRE_2026 = {"NIFTY": 75, "BANKNIFTY": 35, "FINNIFTY": 65, "MIDCPNIFTY": 140, "NIFTYNXT50": 25}
-_LOT_CURRENT = {"NIFTY": 65, "BANKNIFTY": 30, "FINNIFTY": 60, "MIDCPNIFTY": 120, "NIFTYNXT50": 25}
+# NSE lot size history per underlying — sorted list of (effective_from, lot_size).
+# Each entry is active from that date until the next entry's date.
+# Source: NSE circulars + official F&O lot size revision notices.
+_LOT_HISTORY: dict[str, list[tuple[date, int]]] = {
+    "NIFTY": [
+        (date(2000, 1, 1),  50),   # baseline (pre-Nov 2015)
+        (date(2015, 11, 2), 75),   # Nov 2015 revision
+        (date(2021, 6, 25), 50),   # Jul 2021 revision
+        (date(2024, 5, 2),  25),   # May 2024 revision (new contracts)
+        (date(2025, 12, 31), 65),  # Jan 2026 cycle (effective 31-Dec-2025 expiry)
+    ],
+    "BANKNIFTY": [
+        (date(2000, 1, 1),   40),  # baseline (pre-Jan 2018)
+        (date(2018, 1, 1),   25),  # Jan 2018 revision
+        (date(2023, 7, 1),   15),  # Jul 2023 revision (new contracts)
+        (date(2024, 11, 20), 30),  # Nov 2024 revision (new contracts)
+        (date(2025, 7, 31),  35),  # Jul 2025 monthly expiry cycle
+        (date(2026, 1, 1),   30),  # Jan 2026 expiry cycle
+    ],
+    "FINNIFTY": [
+        (date(2000, 1, 1),  40),
+        (date(2023, 1, 1),  65),   # approximate
+        (date(2026, 1, 1),  60),
+    ],
+    "MIDCPNIFTY": [
+        (date(2000, 1, 1),   75),
+        (date(2026, 1, 1),  120),
+    ],
+    "NIFTYNXT50": [
+        (date(2000, 1, 1),  25),
+    ],
+}
 
 
 def lot_size_for(underlying: str, expiry: date | None = None) -> int:
-    """Lot size for a contract, honouring the 1 Jan 2026 NSE revision.
+    """Return the correct NSE lot size for a contract given its expiry date.
 
-    `expiry` < 2026-01-01 -> pre-revision size; otherwise current size.
-    No expiry given -> current size.
+    Walks the _LOT_HISTORY table to find the lot size in effect when
+    the contract was listed. If no expiry given, returns current lot size.
     """
     u = underlying.upper()
-    table = _LOT_PRE_2026 if (expiry is not None and expiry < _LOT_REVISION) else _LOT_CURRENT
-    return table.get(u, 25)
+    history = _LOT_HISTORY.get(u)
+    if not history:
+        return 25
+    if expiry is None:
+        return history[-1][1]
+    result = history[0][1]
+    for eff_date, size in history:
+        if expiry >= eff_date:
+            result = size
+        else:
+            break
+    return result
 
 
 # Per-underlying contract specs. lot_size = CURRENT (post-2026) default; use

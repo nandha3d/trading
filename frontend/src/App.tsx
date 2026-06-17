@@ -2,16 +2,14 @@ import { useState, useEffect } from "react";
 import StrategyBuilder from "./components/StrategyBuilder";
 import ResultsPanel from "./components/ResultsPanel";
 import OptionsChain from "./components/OptionsChain";
-import InstitutionalAnalytics from "./components/InstitutionalAnalytics";
 import FlowMatrix from "./components/FlowMatrix";
 import Dashboard from "./components/Dashboard";
 import BacktestLoader from "./components/BacktestLoader";
 import GridSweep from "./components/GridSweep";
-import LiveTab from "./components/LiveTab";
 import { getStatus } from "./api";
 import type { BacktestResponse, DbStatus } from "./types";
 
-type Tab = "dashboard" | "backtest" | "sweep" | "chain" | "institutional" | "flow" | "live";
+type Tab = "oi-matrix" | "dashboard" | "backtest" | "sweep" | "chain";
 
 function fmtM(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -20,18 +18,16 @@ function fmtM(n: number) {
 }
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: "oi-matrix", label: "OI Matrix" },
   { id: "dashboard", label: "Dashboard" },
   { id: "backtest", label: "Backtest" },
   { id: "sweep", label: "Auto Sweep" },
   { id: "chain", label: "Options Chain" },
-  { id: "flow", label: "FlowMatrix" },
-  { id: "institutional", label: "Institutional Analytics" },
-  { id: "live", label: "Live" },
 ];
 
 export default function App() {
   const [tab, setTab] = useState<Tab>(
-    () => (localStorage.getItem("ob_tab") as Tab) ?? "dashboard"
+    () => (localStorage.getItem("ob_tab") as Tab) ?? "oi-matrix"
   );
   const [result, setResult] = useState<BacktestResponse | null>(null);
   const [status, setStatus] = useState<DbStatus | null>(null);
@@ -87,6 +83,9 @@ export default function App() {
       </header>
 
       {/* All tabs stay mounted — only visibility toggles. State (legs, payoff, WS) survives navigation. */}
+      <div className={`flex-1 overflow-y-auto p-6 bg-gray-950 ${tab !== "oi-matrix" ? "hidden" : ""}`}>
+        <FlowMatrix />
+      </div>
       <div className={`flex-1 overflow-y-auto p-6 bg-gray-950 ${tab !== "dashboard" ? "hidden" : ""}`}>
         <Dashboard />
       </div>
@@ -115,15 +114,6 @@ export default function App() {
       </div>
       <div className={`flex-1 overflow-y-auto p-6 bg-gray-950 ${tab !== "chain" ? "hidden" : ""}`}>
         <OptionsChain />
-      </div>
-      <div className={`flex-1 overflow-y-auto p-6 bg-gray-950 ${tab !== "flow" ? "hidden" : ""}`}>
-        <FlowMatrix />
-      </div>
-      <div className={`flex-1 overflow-y-auto p-6 bg-gray-950 ${tab !== "institutional" ? "hidden" : ""}`}>
-        <InstitutionalAnalytics />
-      </div>
-      <div className={`flex-1 overflow-y-auto p-6 bg-gray-950 ${tab !== "live" ? "hidden" : ""}`}>
-        <LiveTab />
       </div>
     </div>
   );

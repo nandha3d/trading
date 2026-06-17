@@ -194,6 +194,28 @@ export async function getOiTools(
   return _json<OiToolsResponse>(res);
 }
 
+export interface FiiDiiParticipant {
+  date: string;
+  client_type: string;
+  fut_idx_long: number | null;
+  fut_idx_short: number | null;
+  opt_call_long: number | null;
+  opt_call_short: number | null;
+  opt_put_long: number | null;
+  opt_put_short: number | null;
+}
+
+export interface FiiDiiDay {
+  date: string;
+  participants: FiiDiiParticipant[];
+}
+
+export async function getFiiDii(days = 30): Promise<FiiDiiDay[]> {
+  const res = await fetch(`${BASE}/fii-dii?days=${days}`);
+  const data = await _json<{ days: FiiDiiDay[] }>(res);
+  return data.days;
+}
+
 export interface Candle {
   time: number; open: number; high: number; low: number; close: number; volume: number;
 }
