@@ -18,6 +18,47 @@ interface Props {
 }
 
 type LegRow = LegSpec & { id: string };
+type Underlying = "NIFTY" | "BANKNIFTY";
+
+const CONTRACT_META: Record<Underlying, { referenceSpot: number; strikeStep: number; defaultPremium: number }> = {
+  NIFTY: { referenceSpot: 24000, strikeStep: 50, defaultPremium: 100 },
+  BANKNIFTY: { referenceSpot: 52000, strikeStep: 100, defaultPremium: 250 },
+};
+
+const nextWeeklyExpiryISO = (today = new Date()) => {
+  const expiry = new Date(today);
+  const targetDay = 2; // Tuesday weekly index options.
+  const daysUntilExpiry = (targetDay - expiry.getDay() + 7) % 7 || 7;
+  expiry.setDate(expiry.getDate() + daysUntilExpiry);
+  return expiry.toISOString().slice(0, 10);
+};
+
+const representativeStrike = (underlying: Underlying, leg: LegSpec) => {
+  const meta = CONTRACT_META[underlying];
+  const atm = Math.round(meta.referenceSpot / meta.strikeStep) * meta.strikeStep;
+  if (leg.selection === "ATM") {
+    return atm + Math.trunc(leg.value || 0) * meta.strikeStep;
+  }
+  return atm;
+};
+
+const representativeEntryPrice = (underlying: Underlying, leg: LegSpec) => {
+  if (leg.selection === "PREMIUM" && leg.value > 0) {
+    return leg.value;
+  }
+  return CONTRACT_META[underlying].defaultPremium;
+};
+
+const toPayoffCompatibleLegs = (underlying: Underlying, expiry: string, rows: LegRow[]) =>
+  rows.map(({ id: _id, ...leg }) => ({
+    action: leg.action,
+    opt_type: leg.opt_type,
+    strike: representativeStrike(underlying, leg),
+    lots: leg.lots,
+    entry_price: representativeEntryPrice(underlying, leg),
+    underlying,
+    expiry,
+  }));
 
 const mkLeg = (opt_type: "CE" | "PE" = "CE"): LegRow => ({
   id: Math.random().toString(36).slice(2),
@@ -34,7 +75,7 @@ const CATEGORIES = [
 
 export default function StrategyBuilder({ onResult, onLoading }: Props) {
   const [strategyName, setStrategyName] = useState("My Straddle Strategy");
-  const [underlying, setUnderlying] = useState<"NIFTY" | "BANKNIFTY">("NIFTY");
+  const [underlying, setUnderlying] = useState<Underlying>("NIFTY");
   const [start, setStart] = useState("2023-01-02");
   const [end, setEnd] = useState("2023-12-29");
   const [entryTime, setEntryTime] = useState("09:20");
@@ -74,15 +115,9 @@ export default function StrategyBuilder({ onResult, onLoading }: Props) {
       underlying, legs: legs.map(({ id, ...l }) => l), expiry_offset: expiryOffset
     }).then(setValidation).catch(() => null);
 
-    // Run margin estimate (dummy strike values for estimate)
-    const marginLegs = legs.map((l, i) => ({
-      action: l.action,
-      opt_type: l.opt_type,
-      strike: l.opt_type === "CE" ? 23000 + i * 100 : 23000 - i * 100,
-      lots: l.lots,
-      entry_price: l.value || 100.0
-    }));
-    estimateMargin({ underlying, expiry: "2026-06-30", legs: marginLegs })
+    const expiry = nextWeeklyExpiryISO();
+    const marginLegs = toPayoffCompatibleLegs(underlying, expiry, legs);
+    estimateMargin({ underlying, expiry, legs: marginLegs })
       .then((res) => setEstimatedMargin(res.estimated_margin))
       .catch(() => setEstimatedMargin(0));
   }, [underlying, legs, expiryOffset]);
@@ -111,15 +146,8 @@ export default function StrategyBuilder({ onResult, onLoading }: Props) {
 
   const handleSave = async () => {
     try {
-      // Map legs structure to payoff structure compatibility
-      const payoffLegs = legs.map((l) => ({
-        action: l.action,
-        opt_type: l.opt_type,
-        strike: 23000, // placeholder since strike selection resolved at runtime
-        lots: l.lots,
-        entry_price: l.value || 100.0,
-        underlying
-      }));
+      const expiryStr = nextWeeklyExpiryISO();
+      const payoffLegs = toPayoffCompatibleLegs(underlying, expiryStr, legs);
       // Serialize full strategy builder configuration
       const config = {
         legs: legs.map(({ id: _id, ...rest }) => rest),
@@ -134,10 +162,8 @@ export default function StrategyBuilder({ onResult, onLoading }: Props) {
         indicators,
         entrySignal,
         exitSignal,
+        payoffCompatibleLegs: payoffLegs,
       };
-      const nextExpiry = new Date();
-      nextExpiry.setDate(nextExpiry.getDate() + ((4 - nextExpiry.getDay() + 7) % 7 || 7));
-      const expiryStr = nextExpiry.toISOString().slice(0, 10);
       await saveStrategy(strategyName, underlying, expiryStr, payoffLegs, config);
       setToast("Strategy saved successfully");
       refreshSaved();
