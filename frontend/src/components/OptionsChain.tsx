@@ -434,7 +434,7 @@ export default function OptionsChain() {
     }).strike;
   }, [spotPrice, data]);
 
-  // Ïƒ bands for payoff chart
+  // σ bands for payoff chart
   const daysToExpiry = useMemo(() => {
     const exp = isLive ? liveExpiry : selectedExpiry;
     if (!exp) return 30;
@@ -1161,16 +1161,16 @@ export default function OptionsChain() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
             <div className={`flex items-start gap-2 p-2.5 rounded-lg bg-gray-950/60 border ${oiAnalysis.pcrSignal === "BULLISH" ? "border-green-800/40" : oiAnalysis.pcrSignal === "BEARISH" ? "border-red-800/40" : "border-gray-800/60"}`}>
-              <span>ðŸ“Š</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.pcrNote}</span>
+              <span>📊</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.pcrNote}</span>
             </div>
             <div className={`flex items-start gap-2 p-2.5 rounded-lg bg-gray-950/60 border ${oiAnalysis.painSignal === "BULLISH" ? "border-green-800/40" : oiAnalysis.painSignal === "BEARISH" ? "border-red-800/40" : "border-gray-800/60"}`}>
               <span>🎯</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.painNote}</span>
             </div>
             <div className="flex items-start gap-2 p-2.5 rounded-lg bg-gray-950/60 border border-gray-800/60">
-              <span>⚖ï¸</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.skewNote}</span>
+              <span>⚖️</span><span className="text-gray-300 leading-relaxed">{oiAnalysis.skewNote}</span>
             </div>
             <div className="flex items-start gap-2 p-2.5 rounded-lg bg-gray-950/60 border border-gray-800/60">
-              <span>ðŸ“</span>
+              <span>📍</span>
               <span className="text-gray-300 leading-relaxed">
                 Resistance: <span className="font-bold text-red-400">{oiAnalysis.maxCeOiStrike.toLocaleString("en-IN")}</span>
                 {" "}({fmtLargeNum(oiAnalysis.maxCeOi)} CE OI)
@@ -1714,8 +1714,8 @@ export default function OptionsChain() {
                         <div className="flex items-center gap-2">
                           {legSlHit && <span style={{ color: "var(--ts-loss)", background: "rgba(239,68,68,0.12)", borderRadius: "4px", fontSize: "10px", padding: "2px 6px", fontWeight: 700 }} className="animate-pulse">SL HIT</span>}
                           {legTpHit && <span style={{ color: "var(--ts-profit)", background: "rgba(16,185,129,0.12)", borderRadius: "4px", fontSize: "10px", padding: "2px 6px", fontWeight: 700 }} className="animate-pulse">TP HIT</span>}
-                          {!entryPassed && !legSlHit && !legTpHit && <span style={{ color: "var(--ts-warning)", fontSize: "11px", fontWeight: 700 }}>â³</span>}
-                          {exitPassed && !legSlHit && !legTpHit && <span style={{ color: "var(--ts-muted)", fontSize: "11px", fontWeight: 700 }}>â¹</span>}
+                          {!entryPassed && !legSlHit && !legTpHit && <span style={{ color: "var(--ts-warning)", fontSize: "11px", fontWeight: 700 }}>⏳</span>}
+                          {exitPassed && !legSlHit && !legTpHit && <span style={{ color: "var(--ts-muted)", fontSize: "11px", fontWeight: 700 }}>⏹</span>}
                         </div>
                       </div>
 
@@ -1734,7 +1734,7 @@ export default function OptionsChain() {
                                 <div className="flex items-center gap-2">
                                   <span style={{ color: "var(--ts-text-secondary)", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Entry</span>
                                   <span style={{ color: entryPassed ? "var(--ts-profit)" : "var(--ts-warning)", background: entryPassed ? "rgba(16,185,129,0.10)" : "rgba(245,158,11,0.10)", borderRadius: "4px", fontSize: "9px", padding: "1px 5px", fontWeight: 700 }}>
-                                    {entryPassed ? "✓ IN" : "â³ WAIT"}
+                                    {entryPassed ? "✓ IN" : "⏳ WAIT"}
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
@@ -1745,7 +1745,7 @@ export default function OptionsChain() {
                               <div className="space-y-1">
                                 <div className="flex items-center gap-2">
                                   <span style={{ color: "var(--ts-text-secondary)", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em" }}>Exit</span>
-                                  {exitPassed && <span style={{ color: "var(--ts-loss)", background: "rgba(239,68,68,0.10)", borderRadius: "4px", fontSize: "9px", padding: "1px 5px", fontWeight: 700 }}>â¹ OUT</span>}
+                                  {exitPassed && <span style={{ color: "var(--ts-loss)", background: "rgba(239,68,68,0.10)", borderRadius: "4px", fontSize: "9px", padding: "1px 5px", fontWeight: 700 }}>⏹ OUT</span>}
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                   <input type="time" value={leg.exit_time ?? "15:25"} onChange={e => handleUpdateLeg(leg.id, { exit_time: e.target.value })} style={{ ...inp2, width: "108px" }} />
