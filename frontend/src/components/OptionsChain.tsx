@@ -840,7 +840,7 @@ export default function OptionsChain() {
 
 
   return (
-    <div className="flex flex-col h-full gap-6">
+    <div className="flex flex-col min-h-full gap-6">
       {legs.length > 0 && (
         <div
           onClick={() => workspaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
