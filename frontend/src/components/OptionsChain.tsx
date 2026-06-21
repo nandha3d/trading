@@ -1217,7 +1217,7 @@ export default function OptionsChain() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 flex-shrink-0 min-h-0">
         
         {/* Double sided Option Chain grid (2/3 width) */}
-        <div className="xl:col-span-2 bg-gray-900 border border-gray-800 rounded-xl flex flex-col overflow-hidden min-h-[400px] shadow-lg">
+        <div className="xl:col-span-2 bg-gray-900 border border-gray-800 rounded-xl flex flex-col overflow-hidden h-[640px] shadow-lg">
           <div className="px-5 py-3.5 border-b border-gray-800 bg-gray-900/60 flex items-center justify-between">
             <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
               Double-Sided Option Chain & Opstra-Builder
@@ -1479,7 +1479,7 @@ export default function OptionsChain() {
         </div>
 
         {/* OI Chart Panel (1/3 width) */}
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex flex-col gap-5 min-h-[400px] shadow-lg">
+        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 flex flex-col gap-5 h-[640px] shadow-lg">
           <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
             OI Strike Distribution
           </h3>
