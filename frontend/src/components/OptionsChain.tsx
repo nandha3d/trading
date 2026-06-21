@@ -214,7 +214,19 @@ export default function OptionsChain() {
   }, [oiBuildup]);
 
   // Strategy Builder Workspace State (Opstra)
-  const [legs, setLegs] = useState<BuilderLeg[]>([]);
+  // Persisted across reloads — otherwise the payoff chart vanishes (and looks "broken")
+  // every time the page refreshes, since the workspace only renders when legs exist.
+  const [legs, setLegs] = useState<BuilderLeg[]>(() => {
+    try {
+      const saved = localStorage.getItem("oc_legs");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  useEffect(() => {
+    localStorage.setItem("oc_legs", JSON.stringify(legs));
+  }, [legs]);
   const [expandedLegs, setExpandedLegs] = useState<Set<string>>(new Set());
   const toggleLegExpand = (id: string) =>
     setExpandedLegs(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
