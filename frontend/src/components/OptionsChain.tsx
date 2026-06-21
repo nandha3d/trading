@@ -213,15 +213,6 @@ export default function OptionsChain() {
     return map;
   }, [oiBuildup]);
 
-  // Debounced slider: triggers payoff recalc in historical mode after slider settles
-  const [debouncedSlider, setDebouncedSlider] = useState(sliderVal);
-
-  // SL / TP paper-trade config
-  const [slEnabled, setSlEnabled] = useState(false);
-  const [slPct, setSlPct] = useState(50);
-  const [tpEnabled, setTpEnabled] = useState(false);
-  const [tpPct, setTpPct] = useState(100);
-
   // Strategy Builder Workspace State (Opstra)
   const [legs, setLegs] = useState<BuilderLeg[]>([]);
   const [expandedLegs, setExpandedLegs] = useState<Set<string>>(new Set());
@@ -245,13 +236,6 @@ export default function OptionsChain() {
   useEffect(() => {
     loadSaved();
   }, []);
-
-  // Debounce slider → triggers payoff recalc 500 ms after slider stops moving
-  useEffect(() => {
-    if (isLive) return;
-    const t = setTimeout(() => setDebouncedSlider(sliderVal), 500);
-    return () => clearTimeout(t);
-  }, [sliderVal, isLive]);
 
   // Auto-switch live → historical when market closes at 15:30, jump slider to close
   useEffect(() => {
@@ -421,6 +405,16 @@ export default function OptionsChain() {
   }, [isLive, underlying, liveExpiry, wsReconnect]);
 
   const spotPrice = data?.spot_price ?? null;
+
+  // Debounced spot: triggers payoff recalc whenever the market reference price
+  // settles — drives both slider drags (historical) and live ticks (forward-test),
+  // unlike the old slider-only debounce which froze the curve while isLive.
+  const [debouncedSpot, setDebouncedSpot] = useState<number | null>(spotPrice);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSpot(spotPrice), isLive ? 800 : 400);
+    return () => clearTimeout(t);
+  }, [spotPrice, isLive]);
+
   const futurePrice = data?.future_price ?? null;
   const basis = (futurePrice && spotPrice) ? futurePrice - spotPrice : null;
   
@@ -572,7 +566,7 @@ export default function OptionsChain() {
         console.error("Payoff builder pricing error:", e);
         setPayoffLoading(false);
       });
-  }, [legs, selectedExpiry, liveExpiry, selectedDate, underlying, isLive, debouncedSlider]);
+  }, [legs, selectedExpiry, liveExpiry, selectedDate, underlying, isLive, debouncedSpot]);
 
   // Leg Builder triggers from Options Chain
   const addLeg = (strike: number, opt_type: "CE" | "PE", action: "BUY" | "SELL", entryPrice: number) => {
@@ -820,12 +814,6 @@ export default function OptionsChain() {
     return `${legs.length} Leg Strategy`;
   }, [legs]);
 
-  // SL / TP levels in ₹ (based on net premium of the position)
-  const premium = payoff ? Math.abs(payoff.net_premium) : 0;
-  const slLevel = slEnabled && payoff ? -(premium * slPct / 100) : null;
-  const tpLevel = tpEnabled && payoff ? (premium * tpPct / 100) : null;
-  const slHit = slLevel !== null && spotPnl !== null && spotPnl <= slLevel;
-  const tpHit = tpLevel !== null && spotPnl !== null && spotPnl >= tpLevel;
 
   return (
     <div className="flex flex-col h-full gap-6">
@@ -1912,16 +1900,7 @@ export default function OptionsChain() {
                             label={{ value: "+2SD", fill: "#a78bfa", fontSize: 8, position: "insideTopRight" }} />
                         </>)}
                         {spotPrice && (
-                          <ReferenceLine x={spotPrice} stroke="#22c55e" strokeWidth={1.5} strokeDasharray="4 3"
-                            label={{ value: "SPOT", fill: "#22c55e", fontSize: 8, position: "top" }} />
-                        )}
-                        {slLevel !== null && (
-                          <ReferenceLine y={slLevel} stroke={slHit ? "#ef4444" : "#f97316"} strokeWidth={1.5} strokeDasharray="5 3"
-                            label={{ value: `SL ${slPct}%`, fill: slHit ? "#ef4444" : "#f97316", fontSize: 8, position: "insideLeft" }} />
-                        )}
-                        {tpLevel !== null && (
-                          <ReferenceLine y={tpLevel} stroke={tpHit ? "#22c55e" : "#a3e635"} strokeWidth={1.5} strokeDasharray="5 3"
-                            label={{ value: `TP ${tpPct}%`, fill: tpHit ? "#22c55e" : "#a3e635", fontSize: 8, position: "insideLeft" }} />
+                          <ReferenceLine x={spotPrice} stroke="#22c55e" strokeWidth={1.5} strokeDasharray="4 3" />
                         )}
                         {spotPrice && spotPnl !== null && (() => {
                           const pp = Math.round(spotPnl + ivImpact);
@@ -1991,75 +1970,22 @@ export default function OptionsChain() {
                 </div>
               )}
 
-              {/* Greeks + Paper Trade */}
+              {/* Greeks */}
               {payoff && (
-                <div style={{ borderTop: "1px solid var(--ts-border)", background: "var(--ts-bg-base)" }}
-                  className="grid grid-cols-1 md:grid-cols-2">
-                  {/* Greeks */}
-                  <div style={{ borderRight: "1px solid var(--ts-border)" }} className="p-3">
-                    <div style={{ color: "var(--ts-muted)", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>Greeks</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { label: "Delta",    val: payoff.net_greeks.delta.toFixed(3), color: payoff.net_greeks.delta >= 0 ? "var(--ts-profit)" : "var(--ts-loss)" },
-                        { label: "Gamma",    val: payoff.net_greeks.gamma.toFixed(5), color: "var(--ts-text)" },
-                        { label: "Theta",    val: `₹${Math.round(payoff.net_greeks.theta)}`,  color: payoff.net_greeks.theta >= 0 ? "var(--ts-profit)" : "var(--ts-loss)" },
-                        { label: "Vega/1%", val: `₹${Math.round(payoff.net_greeks.vega)}`,   color: payoff.net_greeks.vega  >= 0 ? "var(--ts-profit)" : "var(--ts-loss)" },
-                      ].map(g => (
-                        <div key={g.label} style={{ background: "var(--ts-bg-elevated)", borderRadius: "8px" }} className="px-2 py-2">
-                          <div style={{ color: "var(--ts-muted)", fontSize: "10px" }}>{g.label}</div>
-                          <div style={{ color: g.color, fontFamily: "monospace", fontSize: "14px", fontWeight: 700 }}>{g.val}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {/* Paper Trade */}
-                  <div className="p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span style={{ color: "var(--ts-muted)", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>Paper Trade</span>
-                      {(slHit || tpHit) && (
-                        <span style={{ color: tpHit ? "var(--ts-profit)" : "var(--ts-loss)", background: tpHit ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)", borderRadius: "4px", fontSize: "10px", padding: "2px 7px", fontWeight: 800 }} className="animate-pulse">
-                          {tpHit ? "TP ✓" : "SL ✗"}
-                        </span>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <div style={{ border: `1px solid ${slEnabled ? (slHit ? "var(--ts-warning)" : "rgba(245,158,11,0.3)") : "var(--ts-border)"}`, borderRadius: "8px" }} className="px-3 py-2">
-                        <div className="flex items-center justify-between">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={slEnabled} onChange={e => setSlEnabled(e.target.checked)} style={{ accentColor: "var(--ts-warning)", width: "13px", height: "13px" }} />
-                            <span style={{ color: "var(--ts-text-secondary)", fontSize: "12px" }}>Stop Loss</span>
-                          </label>
-                          <div className="flex items-center gap-1.5">
-                            <input type="number" min={1} max={200} value={slPct} onChange={e => setSlPct(Math.max(1, Number(e.target.value)))} disabled={!slEnabled}
-                              style={{ background: "var(--ts-bg-elevated)", color: "var(--ts-text)", border: "1px solid var(--ts-border)", borderRadius: "6px", width: "46px", textAlign: "right", fontFamily: "monospace", fontSize: "12px", padding: "2px 6px", outline: "none", opacity: slEnabled ? 1 : 0.4 }} />
-                            <span style={{ color: "var(--ts-muted)", fontSize: "11px" }}>%</span>
-                            {slEnabled && slLevel !== null && <span style={{ color: slHit ? "var(--ts-warning)" : "var(--ts-text-secondary)", fontFamily: "monospace", fontSize: "11px", fontWeight: 700 }}>₹{Math.abs(slLevel).toLocaleString("en-IN")}</span>}
-                          </div>
-                        </div>
+                <div style={{ borderTop: "1px solid var(--ts-border)", background: "var(--ts-bg-base)" }} className="p-3">
+                  <div style={{ color: "var(--ts-muted)", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>Greeks</div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {[
+                      { label: "Delta",    val: payoff.net_greeks.delta.toFixed(3), color: payoff.net_greeks.delta >= 0 ? "var(--ts-profit)" : "var(--ts-loss)" },
+                      { label: "Gamma",    val: payoff.net_greeks.gamma.toFixed(5), color: "var(--ts-text)" },
+                      { label: "Theta",    val: `₹${Math.round(payoff.net_greeks.theta)}`,  color: payoff.net_greeks.theta >= 0 ? "var(--ts-profit)" : "var(--ts-loss)" },
+                      { label: "Vega/1%", val: `₹${Math.round(payoff.net_greeks.vega)}`,   color: payoff.net_greeks.vega  >= 0 ? "var(--ts-profit)" : "var(--ts-loss)" },
+                    ].map(g => (
+                      <div key={g.label} style={{ background: "var(--ts-bg-elevated)", borderRadius: "8px" }} className="px-2 py-2">
+                        <div style={{ color: "var(--ts-muted)", fontSize: "10px" }}>{g.label}</div>
+                        <div style={{ color: g.color, fontFamily: "monospace", fontSize: "14px", fontWeight: 700 }}>{g.val}</div>
                       </div>
-                      <div style={{ border: `1px solid ${tpEnabled ? (tpHit ? "var(--ts-profit)" : "rgba(16,185,129,0.3)") : "var(--ts-border)"}`, borderRadius: "8px" }} className="px-3 py-2">
-                        <div className="flex items-center justify-between">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={tpEnabled} onChange={e => setTpEnabled(e.target.checked)} style={{ accentColor: "var(--ts-profit)", width: "13px", height: "13px" }} />
-                            <span style={{ color: "var(--ts-text-secondary)", fontSize: "12px" }}>Take Profit</span>
-                          </label>
-                          <div className="flex items-center gap-1.5">
-                            <input type="number" min={1} max={500} value={tpPct} onChange={e => setTpPct(Math.max(1, Number(e.target.value)))} disabled={!tpEnabled}
-                              style={{ background: "var(--ts-bg-elevated)", color: "var(--ts-text)", border: "1px solid var(--ts-border)", borderRadius: "6px", width: "46px", textAlign: "right", fontFamily: "monospace", fontSize: "12px", padding: "2px 6px", outline: "none", opacity: tpEnabled ? 1 : 0.4 }} />
-                            <span style={{ color: "var(--ts-muted)", fontSize: "11px" }}>%</span>
-                            {tpEnabled && tpLevel !== null && <span style={{ color: tpHit ? "var(--ts-profit)" : "var(--ts-text-secondary)", fontFamily: "monospace", fontSize: "11px", fontWeight: 700 }}>₹{Math.abs(tpLevel).toLocaleString("en-IN")}</span>}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    {spotPnl !== null && (slEnabled || tpEnabled) && (
-                      <div style={{ borderTop: "1px solid var(--ts-border)", marginTop: "8px", paddingTop: "6px" }} className="flex items-center gap-2">
-                        <span style={{ color: "var(--ts-muted)", fontFamily: "monospace", fontSize: "11px" }}>P&L:</span>
-                        <span style={{ color: spotPnl >= 0 ? "var(--ts-profit)" : "var(--ts-loss)", fontFamily: "monospace", fontSize: "13px", fontWeight: 800 }}>
-                          {spotPnl >= 0 ? "+" : ""}₹{Math.round(spotPnl).toLocaleString("en-IN")}
-                        </span>
-                      </div>
-                    )}
+                    ))}
                   </div>
                 </div>
               )}
