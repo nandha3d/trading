@@ -19,6 +19,7 @@ from .routes import (
     market as mk,
     strategies as st,
     risk as rk,
+    oi_strategy as oi,
 )
 
 app = FastAPI(title="Options Backtest Platform", version="1.0")
@@ -39,6 +40,7 @@ app.include_router(fd.router, prefix="/api")
 app.include_router(mk.router, prefix="/api")
 app.include_router(st.router, prefix="/api")
 app.include_router(rk.router, prefix="/api")
+app.include_router(oi.router, prefix="/api")
 
 dist = Path(__file__).parent.parent / "frontend" / "dist"
 if dist.exists():

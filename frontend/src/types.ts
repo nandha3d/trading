@@ -163,6 +163,206 @@ export interface BacktestResponse {
   run_id?: string;
 }
 
+// ---- OI Strategy Signal Detector ----
+
+export interface OiStrategyConfigOverrides {
+  min_option_oi?: number;
+  min_option_volume?: number;
+  max_bid_ask_spread_percent?: number;
+  min_option_ltp?: number;
+  oi_wall_multiplier?: number;
+  ce_unwinding_threshold_percent?: number;
+  pe_unwinding_threshold_percent?: number;
+  ce_buildup_threshold_percent?: number;
+  pe_buildup_threshold_percent?: number;
+  volume_multiplier?: number;
+  min_signal_score?: number;
+  strong_signal_score?: number;
+  no_trade_first_minutes?: number;
+  no_fresh_trade_after?: string;
+  force_exit_time?: string;
+  premium_sl_percent?: number;
+  premium_target_percent?: number;
+  trailing_sl_percent?: number;
+  max_trades_per_day?: number;
+  monitor_strikes?: number;
+  oi_lookback_candles?: number;
+  pcr_lookback_candles?: number;
+  volume_avg_candles?: number;
+  trend_timeframes?: number[];
+  score_weights?: Record<string, number>;
+  execution_model?: "close" | "adverse_close" | "estimated_spread" | string;
+  slippage_bps?: number;
+  estimated_spread_percent?: number;
+  initial_capital?: number;
+  risk_per_trade_percent?: number;
+  daily_loss_limit_percent?: number;
+  cooldown_after_loss_bars?: number;
+  theta_exit_profile?: string;
+  expiry_day_tightening?: boolean;
+  require_factor_coverage_percent?: number;
+}
+
+export interface OiStrategySignalRequest {
+  underlying: string;
+  date: string;
+  timestamp?: string | null;
+  expiry?: string | null;
+  mode?: string;
+  interval?: number;
+  config?: OiStrategyConfigOverrides;
+}
+
+export interface OiSuggestedLeg extends LegSpec {
+  entry_time?: string | null;
+  exit_time?: string | null;
+}
+
+export interface OiScoreComponent {
+  factor?: string | null;
+  label: string;
+  points: number;
+  max_points: number;
+  passed: boolean;
+  available?: boolean;
+  detail: string;
+  raw_value?: number | string | null;
+  threshold?: number | string | null;
+}
+
+export interface OiWallResult {
+  strike: number;
+  option_type: string;
+  oi: number;
+  avg_oi: number;
+  rank: number;
+  oi_change: number;
+  oi_change_percent: number | null;
+  ltp: number | null;
+  ltp_change_percent: number | null;
+}
+
+export interface OiStrategySignalResponse {
+  underlying: string;
+  expiry: string | null;
+  timestamp: string | null;
+  spot_price: number | null;
+  atm_strike: number | null;
+  signal_type: "BUY_CE" | "BUY_PE" | "NO_TRADE" | string;
+  strategy_name: string;
+  score: number;
+  strength: "STRONG" | "VALID" | "NO_TRADE" | string;
+  reasons: string[];
+  no_trade_reasons: string[];
+  score_breakdown: OiScoreComponent[];
+  factor_scores: OiScoreComponent[];
+  factor_coverage: Record<string, number | string | null>;
+  candidate_signal_type?: string | null;
+  candidate_direction?: string | null;
+  regime?: string | null;
+  walls: {
+    ce_wall: OiWallResult | null;
+    pe_wall: OiWallResult | null;
+  };
+  entry_zone: number | null;
+  stop_loss: number | null;
+  target_1: number | null;
+  target_2: number | null;
+  suggested_legs: OiSuggestedLeg[];
+  data_quality: Record<string, unknown>;
+  config: Record<string, unknown>;
+}
+
+export interface OiStrategyBacktestRequest {
+  underlying: string;
+  start: string;
+  end: string;
+  expiry_offset?: number;
+  interval?: number;
+  mode?: string;
+  config?: OiStrategyConfigOverrides;
+}
+
+export interface OiStrategyBacktestStats {
+  trades: number;
+  wins: number;
+  losses: number;
+  win_rate: number;
+  net_pnl: number;
+  gross_profit: number;
+  gross_loss: number;
+  profit_factor: number;
+  avg_trade: number;
+  avg_win: number;
+  avg_loss: number;
+  max_drawdown: number;
+  expectancy: number;
+  sharpe: number;
+  sortino: number;
+  win_rate_ci_low: number;
+  win_rate_ci_high: number;
+}
+
+export interface OiStrategyBacktestTrade {
+  underlying: string;
+  day: string;
+  expiry: string;
+  entry_time: string;
+  exit_time: string;
+  signal_type: string;
+  strategy_name: string;
+  score: number;
+  strength: string;
+  strike: number;
+  opt_type: string;
+  qty: number;
+  entry_price: number;
+  exit_price: number;
+  raw_entry_price?: number | null;
+  raw_exit_price?: number | null;
+  exit_reason: string;
+  gross_pnl: number;
+  cost: number;
+  net_pnl: number;
+  entry_spot: number | null;
+  reasons: string[];
+  factor_scores: OiScoreComponent[];
+  factor_coverage: Record<string, number | string | null>;
+  wall_strike?: number | null;
+  regime?: string | null;
+  mae: number;
+  mfe: number;
+}
+
+export interface OiStrategyBacktestDay {
+  day: string;
+  trades: number;
+  net_pnl: number;
+  skip_reason: string;
+}
+
+export interface OiStrategyBacktestResponse {
+  underlying: string;
+  start: string;
+  end: string;
+  interval: number;
+  expiry_offset: number;
+  stats: OiStrategyBacktestStats;
+  equity_curve: number[];
+  trades: OiStrategyBacktestTrade[];
+  daily: OiStrategyBacktestDay[];
+  checked_bars: number;
+  no_trade_bars: number;
+  trade_journal: Record<string, unknown>[];
+  baseline_comparison: Record<string, any>;
+  cost_sensitivity: Record<string, any>[];
+  regime_summary: Record<string, any>[];
+  factor_summary: Record<string, any>[];
+  walk_forward_summary: Record<string, any>[];
+  data_quality: Record<string, unknown>;
+  config: Record<string, unknown>;
+}
+
 export interface DbStatus {
   options_1m: {
     rows: number;

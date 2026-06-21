@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { runBacktest, getTemplates, validateStrategy, saveStrategy, listStrategies, deleteStrategy, cloneStrategy, estimateMargin } from "../api";
 import type {
   BacktestResponse, LegSpec, ExitConditionsConfig, EntryConditionsConfig,
-  IndicatorDef, ConditionGroup, SavedStrategy
+  IndicatorDef, ConditionGroup, SavedStrategy, OiStrategySignalResponse
 } from "../types";
 import { DEFAULT_EXIT, DEFAULT_ENTRY } from "../types";
 import ExitConditions from "./ExitConditions";
@@ -11,6 +11,7 @@ import SignalBuilder, { emptyGroup } from "./SignalBuilder";
 import LegBuilder from "./LegBuilder";
 import StrategyValidationPanel from "./StrategyValidationPanel";
 import SavedStrategiesPanel from "./SavedStrategiesPanel";
+import OiStrategyPanel from "./OiStrategyPanel";
 
 interface Props {
   onResult: (r: BacktestResponse) => void;
@@ -233,6 +234,27 @@ export default function StrategyBuilder({ onResult, onLoading }: Props) {
     setToast(`Saved strategy loaded: ${st.name}`);
   };
 
+  const handleLoadOiSuggestion = (signal: OiStrategySignalResponse) => {
+    if (!signal.suggested_legs.length) return;
+    const first = signal.suggested_legs[0];
+    setStrategyName(signal.strategy_name);
+    if (signal.timestamp) {
+      const signalDate = signal.timestamp.slice(0, 10);
+      setStart(signalDate);
+      setEnd(signalDate);
+    }
+    if (first.entry_time) setEntryTime(first.entry_time);
+    if (first.exit_time) {
+      setExitTime(first.exit_time);
+      setExitConds((prev) => ({ ...prev, force_exit_time: first.exit_time || prev.force_exit_time }));
+    }
+    setLegs(signal.suggested_legs.map(({ entry_time: _entry, exit_time: _exit, ...leg }) => ({
+      ...leg,
+      id: Math.random().toString(36).slice(2),
+    })));
+    setToast(`Loaded ${signal.signal_type} OI setup into Strategy Builder`);
+  };
+
   const handleRun = async () => {
     if (!validation.valid) {
       setToast("Please fix validation errors before running backtest.");
@@ -390,6 +412,12 @@ export default function StrategyBuilder({ onResult, onLoading }: Props) {
           <option value={2}>Monthly (2)</option>
         </select>
       </div>
+
+      <OiStrategyPanel
+        underlying={underlying}
+        defaultDate={start}
+        onLoadSuggested={handleLoadOiSuggestion}
+      />
 
       {/* Legs */}
       <div className="space-y-3">

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from datetime import date
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 
@@ -144,6 +144,174 @@ class BacktestResponse(BaseModel):
     equity_curve: list[float]
     skipped_days: int = 0
     run_id: Optional[str] = None
+
+
+# ---- OI strategy signal detector ----
+
+class OiStrategySignalRequest(BaseModel):
+    underlying: str = "NIFTY"
+    date: date
+    timestamp: Optional[str] = None
+    expiry: Optional[date] = None
+    mode: str = "historical"
+    interval: int = 5
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+class OiSuggestedLeg(BaseModel):
+    action: str
+    opt_type: str
+    selection: str = "ATM"
+    value: float = 0
+    lots: int = 1
+    sl_pct: Optional[float] = None
+    sl_unit: str = "PERCENT"
+    tp_pct: Optional[float] = None
+    tp_unit: str = "PERCENT"
+    entry_time: Optional[str] = None
+    exit_time: Optional[str] = None
+
+
+class OiScoreComponent(BaseModel):
+    label: str
+    points: int
+    max_points: int
+    passed: bool
+    detail: str
+    factor: Optional[str] = None
+    available: bool = True
+    raw_value: Optional[Any] = None
+    threshold: Optional[Any] = None
+
+
+class OiWallResult(BaseModel):
+    strike: int
+    option_type: str
+    oi: int
+    avg_oi: float
+    rank: int
+    oi_change: int
+    oi_change_percent: Optional[float] = None
+    ltp: Optional[float] = None
+    ltp_change_percent: Optional[float] = None
+
+
+class OiStrategySignalResponse(BaseModel):
+    underlying: str
+    expiry: Optional[str] = None
+    timestamp: Optional[str] = None
+    spot_price: Optional[float] = None
+    atm_strike: Optional[int] = None
+    signal_type: str
+    strategy_name: str
+    score: int
+    strength: str
+    reasons: list[str]
+    no_trade_reasons: list[str]
+    score_breakdown: list[OiScoreComponent]
+    factor_scores: list[OiScoreComponent] = Field(default_factory=list)
+    factor_coverage: dict[str, Any] = Field(default_factory=dict)
+    candidate_signal_type: Optional[str] = None
+    candidate_direction: Optional[str] = None
+    regime: Optional[str] = None
+    walls: dict[str, Optional[OiWallResult]]
+    entry_zone: Optional[float] = None
+    stop_loss: Optional[float] = None
+    target_1: Optional[float] = None
+    target_2: Optional[float] = None
+    suggested_legs: list[OiSuggestedLeg]
+    data_quality: dict[str, Any]
+    config: dict[str, Any]
+
+
+class OiStrategyBacktestRequest(BaseModel):
+    underlying: str = "NIFTY"
+    start: date
+    end: date
+    expiry_offset: int = 0
+    interval: int = 5
+    mode: str = "historical"
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+class OiStrategyBacktestStats(BaseModel):
+    trades: int
+    wins: int
+    losses: int
+    win_rate: float
+    net_pnl: float
+    gross_profit: float
+    gross_loss: float
+    profit_factor: float
+    avg_trade: float
+    avg_win: float
+    avg_loss: float
+    max_drawdown: float
+    expectancy: float = 0.0
+    sharpe: float = 0.0
+    sortino: float = 0.0
+    win_rate_ci_low: float = 0.0
+    win_rate_ci_high: float = 0.0
+
+
+class OiStrategyBacktestTrade(BaseModel):
+    underlying: str
+    day: str
+    expiry: str
+    entry_time: str
+    exit_time: str
+    signal_type: str
+    strategy_name: str
+    score: int
+    strength: str
+    strike: int
+    opt_type: str
+    qty: int
+    entry_price: float
+    exit_price: float
+    raw_entry_price: Optional[float] = None
+    raw_exit_price: Optional[float] = None
+    exit_reason: str
+    gross_pnl: float
+    cost: float
+    net_pnl: float
+    entry_spot: Optional[float] = None
+    reasons: list[str]
+    factor_scores: list[OiScoreComponent] = Field(default_factory=list)
+    factor_coverage: dict[str, Any] = Field(default_factory=dict)
+    wall_strike: Optional[float] = None
+    regime: Optional[str] = None
+    mae: float = 0.0
+    mfe: float = 0.0
+
+
+class OiStrategyBacktestDay(BaseModel):
+    day: str
+    trades: int
+    net_pnl: float
+    skip_reason: str = ""
+
+
+class OiStrategyBacktestResponse(BaseModel):
+    underlying: str
+    start: str
+    end: str
+    interval: int
+    expiry_offset: int
+    stats: OiStrategyBacktestStats
+    equity_curve: list[float]
+    trades: list[OiStrategyBacktestTrade]
+    daily: list[OiStrategyBacktestDay]
+    checked_bars: int
+    no_trade_bars: int
+    trade_journal: list[dict[str, Any]] = Field(default_factory=list)
+    baseline_comparison: dict[str, Any] = Field(default_factory=dict)
+    cost_sensitivity: list[dict[str, Any]] = Field(default_factory=list)
+    regime_summary: list[dict[str, Any]] = Field(default_factory=list)
+    factor_summary: list[dict[str, Any]] = Field(default_factory=list)
+    walk_forward_summary: list[dict[str, Any]] = Field(default_factory=list)
+    data_quality: dict[str, Any]
+    config: dict[str, Any]
 
 
 # ---- Parametric grid sweep (entry-time x stop-loss%) ----

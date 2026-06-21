@@ -70,13 +70,22 @@ def ingest(underlying: str, src: Path = DEFAULT_SRC, limit: int | None = None) -
         removed = storage.clear_options(underlying.upper())
         if removed:
             print(f"  [{underlying}] cleared {removed:,} existing rows")
-    total = 0
-    for i, f in enumerate(files, 1):
-        df = _load_one(f)
-        if not df.is_empty():
-            total += storage.write_options(df)
-        if i % 100 == 0 or i == len(files):
-            print(f"  [{underlying}] {i}/{len(files)} files, {total:,} rows")
+    
+    con = storage.db()
+    con.execute("BEGIN TRANSACTION")
+    try:
+        total = 0
+        for i, f in enumerate(files, 1):
+            df = _load_one(f)
+            if not df.is_empty():
+                total += storage.write_options(df)
+            if i % 100 == 0 or i == len(files):
+                print(f"  [{underlying}] {i}/{len(files)} files, {total:,} rows")
+        con.execute("COMMIT")
+    except Exception as e:
+        con.execute("ROLLBACK")
+        raise e
+
     if not limit:  # finalize: drop duplicate keys from source overlaps
         dups = storage.dedupe_options(underlying.upper())
         if dups:

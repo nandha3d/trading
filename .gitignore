@@ -13,3 +13,9 @@ dist/
 build/
 logs/
 historical data/
+run_all.bat
+archive (1).zip
+deploy/deploy_ssh.ps1
+deploy/deploy_ssh.sh
+deploy/setup_vps.sh
+deploy/trading.service

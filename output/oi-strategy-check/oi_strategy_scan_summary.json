@@ -1,0 +1,1813 @@
+{
+  "summary": {
+    "scan": {
+      "underlyings": [
+        "NIFTY",
+        "BANKNIFTY"
+      ],
+      "latest_days_per_underlying": 12,
+      "times_checked": [
+        "09:35",
+        "10:30",
+        "12:30",
+        "14:30"
+      ],
+      "elapsed_seconds": 20.86,
+      "method": "First valid OI signal per day; long ATM CE/PE; exit at 15:15; existing options cost model subtracted."
+    },
+    "signals": 9,
+    "total_net_pnl": -500.15,
+    "avg_net_pnl": -55.57,
+    "wins": 4,
+    "losses": 5,
+    "win_rate": 44.44,
+    "max_drawdown": -8333.38,
+    "by_underlying": {
+      "NIFTY": {
+        "signals": 5,
+        "net_pnl": 1939.82,
+        "win_rate": 60.0
+      },
+      "BANKNIFTY": {
+        "signals": 4,
+        "net_pnl": -2439.97,
+        "win_rate": 25.0
+      }
+    }
+  },
+  "trades": [
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-09",
+      "entry_time": "14:30",
+      "exit_time": "15:15",
+      "expiry": "2026-04-13",
+      "signal_type": "BUY_PE",
+      "score": 80,
+      "strike": 23750,
+      "opt_type": "PE",
+      "entry_price": 210.75,
+      "exit_price": 169.9,
+      "qty": 65,
+      "gross_pnl": -2655.25,
+      "cost": 68.9,
+      "net_pnl": -2724.15,
+      "top_reasons": [
+        "Spot 23765.00 is below VWAP 23904.15",
+        "5-minute close broke PE wall 23800",
+        "23800 PE OI changed -5.5%"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-07",
+      "entry_time": "14:30",
+      "exit_time": "15:15",
+      "expiry": "2026-04-07",
+      "signal_type": "BUY_CE",
+      "score": 85,
+      "strike": 23100,
+      "opt_type": "CE",
+      "entry_price": 12.2,
+      "exit_price": 16.8,
+      "qty": 65,
+      "gross_pnl": 299.0,
+      "cost": 49.1,
+      "net_pnl": 249.9,
+      "top_reasons": [
+        "Spot 23082.30 is above VWAP 22972.37",
+        "5-minute close broke CE wall 23000",
+        "23000 CE OI changed -14.4%"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-01",
+      "entry_time": "10:30",
+      "exit_time": "15:15",
+      "expiry": "2026-04-07",
+      "signal_type": "BUY_PE",
+      "score": 75,
+      "strike": 22900,
+      "opt_type": "PE",
+      "entry_price": 350.05,
+      "exit_price": 403.3,
+      "qty": 65,
+      "gross_pnl": 3461.25,
+      "cost": 94.37,
+      "net_pnl": 3366.88,
+      "top_reasons": [
+        "Spot 22888.00 is below VWAP 22949.24",
+        "5-minute close broke PE wall 22900",
+        "22900 PE OI changed -12.5%"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-27",
+      "entry_time": "09:35",
+      "exit_time": "15:15",
+      "expiry": "2026-03-30",
+      "signal_type": "BUY_PE",
+      "score": 75,
+      "strike": 23050,
+      "opt_type": "PE",
+      "entry_price": 268.6,
+      "exit_price": 347.15,
+      "qty": 65,
+      "gross_pnl": 5105.75,
+      "cost": 86.86,
+      "net_pnl": 5018.89,
+      "top_reasons": [
+        "Spot 23030.00 is below VWAP 23074.53",
+        "5-minute close broke PE wall 23100",
+        "23100 PE OI changed -7.2%"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-24",
+      "entry_time": "10:30",
+      "exit_time": "15:15",
+      "expiry": "2026-03-24",
+      "signal_type": "BUY_PE",
+      "score": 85,
+      "strike": 22650,
+      "opt_type": "PE",
+      "entry_price": 60.45,
+      "exit_price": 0.1,
+      "qty": 65,
+      "gross_pnl": -3922.75,
+      "cost": 48.95,
+      "net_pnl": -3971.7,
+      "top_reasons": [
+        "Spot 22660.10 is below VWAP 22774.43",
+        "5-minute close broke PE wall 22700",
+        "22700 PE OI changed -13.1%"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-23",
+      "entry_time": "12:30",
+      "exit_time": "15:15",
+      "expiry": "2026-02-24",
+      "signal_type": "BUY_PE",
+      "score": 75,
+      "strike": 61100,
+      "opt_type": "PE",
+      "entry_price": 290.2,
+      "exit_price": 153.9,
+      "qty": 30,
+      "gross_pnl": -4089.0,
+      "cost": 57.59,
+      "net_pnl": -4146.59,
+      "top_reasons": [
+        "Spot 61086.60 is below VWAP 61260.11",
+        "5-minute close broke PE wall 61200",
+        "61200 PE OI changed -11.6%"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-17",
+      "entry_time": "10:30",
+      "exit_time": "15:15",
+      "expiry": "2026-02-24",
+      "signal_type": "BUY_CE",
+      "score": 90,
+      "strike": 61100,
+      "opt_type": "CE",
+      "entry_price": 405.45,
+      "exit_price": 400.6,
+      "qty": 30,
+      "gross_pnl": -145.5,
+      "cost": 69.59,
+      "net_pnl": -215.09,
+      "top_reasons": [
+        "Spot 61080.20 is above VWAP 60841.91",
+        "5-minute close broke CE wall 61000",
+        "61000 CE OI changed -9.4%"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-16",
+      "entry_time": "12:30",
+      "exit_time": "15:15",
+      "expiry": "2026-02-24",
+      "signal_type": "BUY_CE",
+      "score": 80,
+      "strike": 60800,
+      "opt_type": "CE",
+      "entry_price": 396.65,
+      "exit_price": 520.05,
+      "qty": 30,
+      "gross_pnl": 3702.0,
+      "cost": 74.54,
+      "net_pnl": 3627.46,
+      "top_reasons": [
+        "Spot 60770.00 is above VWAP 60466.47",
+        "5-minute close broke CE wall 60500",
+        "60700 PE OI changed 5.5%"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-10",
+      "entry_time": "10:30",
+      "exit_time": "15:15",
+      "expiry": "2026-02-24",
+      "signal_type": "BUY_CE",
+      "score": 80,
+      "strike": 60800,
+      "opt_type": "CE",
+      "entry_price": 490.8,
+      "exit_price": 436.35,
+      "qty": 30,
+      "gross_pnl": -1633.5,
+      "cost": 72.25,
+      "net_pnl": -1705.75,
+      "top_reasons": [
+        "Spot 60833.40 is above VWAP 60772.55",
+        "5-minute close broke CE wall 60700",
+        "60800 PE OI changed 11.7%"
+      ]
+    }
+  ],
+  "snapshots": [
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-13",
+      "time": "09:35",
+      "expiry": "2026-04-13",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 25,
+      "strength": "NO_TRADE",
+      "spot_price": 23642.0,
+      "atm_strike": 23650,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 25/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-13",
+      "time": "10:30",
+      "expiry": "2026-04-13",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 23759.0,
+      "atm_strike": 23750,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-13",
+      "time": "12:30",
+      "expiry": "2026-04-13",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 23860.0,
+      "atm_strike": 23850,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-13",
+      "time": "14:30",
+      "expiry": "2026-04-13",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 65,
+      "strength": "NO_TRADE",
+      "spot_price": 23911.0,
+      "atm_strike": 23900,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 65/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-10",
+      "time": "09:35",
+      "expiry": "2026-04-13",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 55,
+      "strength": "NO_TRADE",
+      "spot_price": 23982.8,
+      "atm_strike": 24000,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 55/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-10",
+      "time": "10:30",
+      "expiry": "2026-04-13",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 55,
+      "strength": "NO_TRADE",
+      "spot_price": 24065.0,
+      "atm_strike": 24050,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 55/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-10",
+      "time": "12:30",
+      "expiry": "2026-04-13",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 24053.7,
+      "atm_strike": 24050,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-10",
+      "time": "14:30",
+      "expiry": "2026-04-13",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 20,
+      "strength": "NO_TRADE",
+      "spot_price": 24015.0,
+      "atm_strike": 24000,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 20/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-09",
+      "time": "09:35",
+      "expiry": "2026-04-13",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 55,
+      "strength": "NO_TRADE",
+      "spot_price": 23962.5,
+      "atm_strike": 23950,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 55/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-09",
+      "time": "10:30",
+      "expiry": "2026-04-13",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 40,
+      "strength": "NO_TRADE",
+      "spot_price": 23925.0,
+      "atm_strike": 23900,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 40/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-09",
+      "time": "12:30",
+      "expiry": "2026-04-13",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 23933.0,
+      "atm_strike": 23950,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-09",
+      "time": "14:30",
+      "expiry": "2026-04-13",
+      "signal_type": "BUY_PE",
+      "strategy_name": "Bearish OI Wall Breakdown",
+      "score": 80,
+      "strength": "VALID",
+      "spot_price": 23765.0,
+      "atm_strike": 23750,
+      "reasons": [
+        "Spot 23765.00 is below VWAP 23904.15",
+        "5-minute close broke PE wall 23800",
+        "23800 PE OI changed -5.5%",
+        "Volume is 1.6x average",
+        "ATM PE premium changed 5.7%"
+      ],
+      "no_trade_reasons": []
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-08",
+      "time": "09:35",
+      "expiry": "2026-04-13",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 65,
+      "strength": "NO_TRADE",
+      "spot_price": 23953.0,
+      "atm_strike": 23950,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 65/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-08",
+      "time": "10:30",
+      "expiry": "2026-04-13",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 55,
+      "strength": "NO_TRADE",
+      "spot_price": 23962.6,
+      "atm_strike": 23950,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 55/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-08",
+      "time": "12:30",
+      "expiry": "2026-04-13",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 50,
+      "strength": "NO_TRADE",
+      "spot_price": 23960.0,
+      "atm_strike": 23950,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 50/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-08",
+      "time": "14:30",
+      "expiry": "2026-04-13",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 24040.3,
+      "atm_strike": 24050,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-07",
+      "time": "09:35",
+      "expiry": "2026-04-07",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 22903.6,
+      "atm_strike": 22900,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-07",
+      "time": "10:30",
+      "expiry": "2026-04-07",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 22970.2,
+      "atm_strike": 22950,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-07",
+      "time": "12:30",
+      "expiry": "2026-04-07",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 15,
+      "strength": "NO_TRADE",
+      "spot_price": 22982.8,
+      "atm_strike": 23000,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 15/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-07",
+      "time": "14:30",
+      "expiry": "2026-04-07",
+      "signal_type": "BUY_CE",
+      "strategy_name": "Bullish OI Wall Breakout",
+      "score": 85,
+      "strength": "STRONG",
+      "spot_price": 23082.3,
+      "atm_strike": 23100,
+      "reasons": [
+        "Spot 23082.30 is above VWAP 22972.37",
+        "5-minute close broke CE wall 23000",
+        "23000 CE OI changed -14.4%",
+        "23050 PE OI changed 41.6%",
+        "ATM CE premium changed 24.7%"
+      ],
+      "no_trade_reasons": []
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-06",
+      "time": "09:35",
+      "expiry": "2026-04-07",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 65,
+      "strength": "NO_TRADE",
+      "spot_price": 22780.3,
+      "atm_strike": 22800,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 65/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-06",
+      "time": "10:30",
+      "expiry": "2026-04-07",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 22720.7,
+      "atm_strike": 22700,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-06",
+      "time": "12:30",
+      "expiry": "2026-04-07",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 55,
+      "strength": "NO_TRADE",
+      "spot_price": 22725.0,
+      "atm_strike": 22700,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 55/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-06",
+      "time": "14:30",
+      "expiry": "2026-04-07",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 45,
+      "strength": "NO_TRADE",
+      "spot_price": 23015.0,
+      "atm_strike": 23000,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 45/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-02",
+      "time": "09:35",
+      "expiry": "2026-04-07",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 22359.7,
+      "atm_strike": 22350,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-02",
+      "time": "10:30",
+      "expiry": "2026-04-07",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 20,
+      "strength": "NO_TRADE",
+      "spot_price": 22305.0,
+      "atm_strike": 22300,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 20/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-02",
+      "time": "12:30",
+      "expiry": "2026-04-07",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 65,
+      "strength": "NO_TRADE",
+      "spot_price": 22396.0,
+      "atm_strike": 22400,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 65/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-02",
+      "time": "14:30",
+      "expiry": "2026-04-07",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 50,
+      "strength": "NO_TRADE",
+      "spot_price": 22750.0,
+      "atm_strike": 22750,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 50/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-01",
+      "time": "09:35",
+      "expiry": "2026-04-07",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 55,
+      "strength": "NO_TRADE",
+      "spot_price": 22907.4,
+      "atm_strike": 22900,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 55/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-01",
+      "time": "10:30",
+      "expiry": "2026-04-07",
+      "signal_type": "BUY_PE",
+      "strategy_name": "Bearish OI Wall Breakdown",
+      "score": 75,
+      "strength": "VALID",
+      "spot_price": 22888.0,
+      "atm_strike": 22900,
+      "reasons": [
+        "Spot 22888.00 is below VWAP 22949.24",
+        "5-minute close broke PE wall 22900",
+        "22900 PE OI changed -12.5%",
+        "22900 CE OI changed 6.1%"
+      ],
+      "no_trade_reasons": []
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-01",
+      "time": "12:30",
+      "expiry": "2026-04-07",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 22955.0,
+      "atm_strike": 22950,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-04-01",
+      "time": "14:30",
+      "expiry": "2026-04-07",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 20,
+      "strength": "NO_TRADE",
+      "spot_price": 22825.4,
+      "atm_strike": 22850,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 20/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-30",
+      "time": "09:35",
+      "expiry": "2026-03-30",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 22678.4,
+      "atm_strike": 22700,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-30",
+      "time": "10:30",
+      "expiry": "2026-03-30",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 22523.8,
+      "atm_strike": 22500,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-30",
+      "time": "12:30",
+      "expiry": "2026-03-30",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 20,
+      "strength": "NO_TRADE",
+      "spot_price": 22508.6,
+      "atm_strike": 22500,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 20/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-30",
+      "time": "14:30",
+      "expiry": "2026-03-30",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 50,
+      "strength": "NO_TRADE",
+      "spot_price": 22367.0,
+      "atm_strike": 22350,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 50/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-27",
+      "time": "09:35",
+      "expiry": "2026-03-30",
+      "signal_type": "BUY_PE",
+      "strategy_name": "Bearish OI Wall Breakdown",
+      "score": 75,
+      "strength": "VALID",
+      "spot_price": 23030.0,
+      "atm_strike": 23050,
+      "reasons": [
+        "Spot 23030.00 is below VWAP 23074.53",
+        "5-minute close broke PE wall 23100",
+        "23100 PE OI changed -7.2%",
+        "23050 CE OI changed 13.7%"
+      ],
+      "no_trade_reasons": []
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-27",
+      "time": "10:30",
+      "expiry": "2026-03-30",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 20,
+      "strength": "NO_TRADE",
+      "spot_price": 23024.0,
+      "atm_strike": 23000,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 20/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-27",
+      "time": "12:30",
+      "expiry": "2026-03-30",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 22964.9,
+      "atm_strike": 22950,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-27",
+      "time": "14:30",
+      "expiry": "2026-03-30",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 45,
+      "strength": "NO_TRADE",
+      "spot_price": 22850.0,
+      "atm_strike": 22850,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 45/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-25",
+      "time": "09:35",
+      "expiry": "2026-03-26",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 0,
+      "strength": "NO_TRADE",
+      "spot_price": null,
+      "atm_strike": null,
+      "reasons": [],
+      "no_trade_reasons": [
+        "No option-chain data for selected session/expiry"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-25",
+      "time": "10:30",
+      "expiry": "2026-03-26",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 0,
+      "strength": "NO_TRADE",
+      "spot_price": null,
+      "atm_strike": null,
+      "reasons": [],
+      "no_trade_reasons": [
+        "No option-chain data for selected session/expiry"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-25",
+      "time": "12:30",
+      "expiry": "2026-03-26",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 0,
+      "strength": "NO_TRADE",
+      "spot_price": null,
+      "atm_strike": null,
+      "reasons": [],
+      "no_trade_reasons": [
+        "No option-chain data for selected session/expiry"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-25",
+      "time": "14:30",
+      "expiry": "2026-03-26",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 0,
+      "strength": "NO_TRADE",
+      "spot_price": null,
+      "atm_strike": null,
+      "reasons": [],
+      "no_trade_reasons": [
+        "No option-chain data for selected session/expiry"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-24",
+      "time": "09:35",
+      "expiry": "2026-03-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 65,
+      "strength": "NO_TRADE",
+      "spot_price": 22764.2,
+      "atm_strike": 22750,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 65/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-24",
+      "time": "10:30",
+      "expiry": "2026-03-24",
+      "signal_type": "BUY_PE",
+      "strategy_name": "Bearish OI Wall Breakdown",
+      "score": 85,
+      "strength": "STRONG",
+      "spot_price": 22660.1,
+      "atm_strike": 22650,
+      "reasons": [
+        "Spot 22660.10 is below VWAP 22774.43",
+        "5-minute close broke PE wall 22700",
+        "22700 PE OI changed -13.1%",
+        "22650 CE OI changed 23.3%",
+        "ATM PE premium changed 58.0%"
+      ],
+      "no_trade_reasons": []
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-24",
+      "time": "12:30",
+      "expiry": "2026-03-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 65,
+      "strength": "NO_TRADE",
+      "spot_price": 22920.0,
+      "atm_strike": 22900,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 65/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "NIFTY",
+      "day": "2026-03-24",
+      "time": "14:30",
+      "expiry": "2026-03-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 25,
+      "strength": "NO_TRADE",
+      "spot_price": 22943.3,
+      "atm_strike": 22950,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 25/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-23",
+      "time": "09:35",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 45,
+      "strength": "NO_TRADE",
+      "spot_price": 61320.0,
+      "atm_strike": 61300,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 45/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-23",
+      "time": "10:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 20,
+      "strength": "NO_TRADE",
+      "spot_price": 61308.6,
+      "atm_strike": 61300,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 20/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-23",
+      "time": "12:30",
+      "expiry": "2026-02-24",
+      "signal_type": "BUY_PE",
+      "strategy_name": "Bearish OI Wall Breakdown",
+      "score": 75,
+      "strength": "VALID",
+      "spot_price": 61086.6,
+      "atm_strike": 61100,
+      "reasons": [
+        "Spot 61086.60 is below VWAP 61260.11",
+        "5-minute close broke PE wall 61200",
+        "61200 PE OI changed -11.6%",
+        "61100 CE OI changed 10.5%"
+      ],
+      "no_trade_reasons": []
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-23",
+      "time": "14:30",
+      "expiry": "2026-02-24",
+      "signal_type": "BUY_CE",
+      "strategy_name": "Bullish OI Wall Breakout",
+      "score": 85,
+      "strength": "STRONG",
+      "spot_price": 61200.0,
+      "atm_strike": 61200,
+      "reasons": [
+        "5-minute close broke CE wall 61000",
+        "61000 CE OI changed -8.3%",
+        "61200 PE OI changed 7.4%",
+        "Volume is 2.7x average",
+        "ATM CE premium changed 5.3%"
+      ],
+      "no_trade_reasons": []
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-20",
+      "time": "09:35",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 55,
+      "strength": "NO_TRADE",
+      "spot_price": 60944.0,
+      "atm_strike": 60900,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 55/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-20",
+      "time": "10:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 55,
+      "strength": "NO_TRADE",
+      "spot_price": 61170.0,
+      "atm_strike": 61200,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 55/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-20",
+      "time": "12:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 55,
+      "strength": "NO_TRADE",
+      "spot_price": 61350.0,
+      "atm_strike": 61400,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 55/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-20",
+      "time": "14:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 45,
+      "strength": "NO_TRADE",
+      "spot_price": 61198.6,
+      "atm_strike": 61200,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 45/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-19",
+      "time": "09:35",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 61423.2,
+      "atm_strike": 61400,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-19",
+      "time": "10:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 61305.0,
+      "atm_strike": 61300,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-19",
+      "time": "12:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 20,
+      "strength": "NO_TRADE",
+      "spot_price": 61100.0,
+      "atm_strike": 61100,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 20/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-19",
+      "time": "14:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 60985.2,
+      "atm_strike": 61000,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-18",
+      "time": "09:35",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 55,
+      "strength": "NO_TRADE",
+      "spot_price": 61208.4,
+      "atm_strike": 61200,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 55/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-18",
+      "time": "10:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 20,
+      "strength": "NO_TRADE",
+      "spot_price": 61180.0,
+      "atm_strike": 61200,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 20/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-18",
+      "time": "12:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 61241.4,
+      "atm_strike": 61200,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-18",
+      "time": "14:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 61431.4,
+      "atm_strike": 61400,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-17",
+      "time": "09:35",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 60699.6,
+      "atm_strike": 60700,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-17",
+      "time": "10:30",
+      "expiry": "2026-02-24",
+      "signal_type": "BUY_CE",
+      "strategy_name": "Bullish OI Wall Breakout",
+      "score": 90,
+      "strength": "STRONG",
+      "spot_price": 61080.2,
+      "atm_strike": 61100,
+      "reasons": [
+        "Spot 61080.20 is above VWAP 60841.91",
+        "5-minute close broke CE wall 61000",
+        "61000 CE OI changed -9.4%",
+        "61100 PE OI changed 56.7%",
+        "Volume is 1.8x average"
+      ],
+      "no_trade_reasons": []
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-17",
+      "time": "12:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 61071.0,
+      "atm_strike": 61100,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-17",
+      "time": "14:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 45,
+      "strength": "NO_TRADE",
+      "spot_price": 61097.6,
+      "atm_strike": 61100,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 45/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-16",
+      "time": "09:35",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 60326.2,
+      "atm_strike": 60300,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-16",
+      "time": "10:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 55,
+      "strength": "NO_TRADE",
+      "spot_price": 60473.0,
+      "atm_strike": 60500,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 55/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-16",
+      "time": "12:30",
+      "expiry": "2026-02-24",
+      "signal_type": "BUY_CE",
+      "strategy_name": "Bullish OI Wall Breakout",
+      "score": 80,
+      "strength": "VALID",
+      "spot_price": 60770.0,
+      "atm_strike": 60800,
+      "reasons": [
+        "Spot 60770.00 is above VWAP 60466.47",
+        "5-minute close broke CE wall 60500",
+        "60700 PE OI changed 5.5%",
+        "Volume is 6.3x average",
+        "ATM CE premium changed 9.8%"
+      ],
+      "no_trade_reasons": []
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-16",
+      "time": "14:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 60848.0,
+      "atm_strike": 60800,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-13",
+      "time": "09:35",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 55,
+      "strength": "NO_TRADE",
+      "spot_price": 60538.8,
+      "atm_strike": 60500,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 55/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-13",
+      "time": "10:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 60550.2,
+      "atm_strike": 60600,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-13",
+      "time": "12:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 20,
+      "strength": "NO_TRADE",
+      "spot_price": 60514.8,
+      "atm_strike": 60500,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 20/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-13",
+      "time": "14:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 60412.0,
+      "atm_strike": 60400,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-12",
+      "time": "09:35",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 55,
+      "strength": "NO_TRADE",
+      "spot_price": 60848.0,
+      "atm_strike": 60800,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 55/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-12",
+      "time": "10:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 60905.8,
+      "atm_strike": 60900,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-12",
+      "time": "12:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 20,
+      "strength": "NO_TRADE",
+      "spot_price": 60822.8,
+      "atm_strike": 60800,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 20/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-12",
+      "time": "14:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 20,
+      "strength": "NO_TRADE",
+      "spot_price": 60800.0,
+      "atm_strike": 60800,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 20/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-11",
+      "time": "09:35",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 60,
+      "strength": "NO_TRADE",
+      "spot_price": 60615.0,
+      "atm_strike": 60600,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 60/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-11",
+      "time": "10:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 60747.6,
+      "atm_strike": 60700,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-11",
+      "time": "12:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 60737.2,
+      "atm_strike": 60700,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-11",
+      "time": "14:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 60797.8,
+      "atm_strike": 60800,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-10",
+      "time": "09:35",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 55,
+      "strength": "NO_TRADE",
+      "spot_price": 60780.0,
+      "atm_strike": 60800,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 55/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-10",
+      "time": "10:30",
+      "expiry": "2026-02-24",
+      "signal_type": "BUY_CE",
+      "strategy_name": "Bullish OI Wall Breakout",
+      "score": 80,
+      "strength": "VALID",
+      "spot_price": 60833.4,
+      "atm_strike": 60800,
+      "reasons": [
+        "Spot 60833.40 is above VWAP 60772.55",
+        "5-minute close broke CE wall 60700",
+        "60800 PE OI changed 11.7%",
+        "Volume is 2.2x average",
+        "ATM CE premium changed 5.2%"
+      ],
+      "no_trade_reasons": []
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-10",
+      "time": "12:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 60816.2,
+      "atm_strike": 60800,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-10",
+      "time": "14:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 20,
+      "strength": "NO_TRADE",
+      "spot_price": 60719.0,
+      "atm_strike": 60700,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 20/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-09",
+      "time": "09:35",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 55,
+      "strength": "NO_TRADE",
+      "spot_price": 60719.2,
+      "atm_strike": 60700,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 55/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-09",
+      "time": "10:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 45,
+      "strength": "NO_TRADE",
+      "spot_price": 60740.0,
+      "atm_strike": 60700,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 45/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-09",
+      "time": "12:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 20,
+      "strength": "NO_TRADE",
+      "spot_price": 60712.4,
+      "atm_strike": 60700,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 20/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-09",
+      "time": "14:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 60727.8,
+      "atm_strike": 60700,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-06",
+      "time": "09:35",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 60181.4,
+      "atm_strike": 60200,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-06",
+      "time": "10:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 50,
+      "strength": "NO_TRADE",
+      "spot_price": 59951.0,
+      "atm_strike": 60000,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 50/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-06",
+      "time": "12:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 59959.0,
+      "atm_strike": 60000,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    },
+    {
+      "underlying": "BANKNIFTY",
+      "day": "2026-02-06",
+      "time": "14:30",
+      "expiry": "2026-02-24",
+      "signal_type": "NO_TRADE",
+      "strategy_name": "No-trade: confirmation missing",
+      "score": 35,
+      "strength": "NO_TRADE",
+      "spot_price": 60140.0,
+      "atm_strike": 60100,
+      "reasons": [],
+      "no_trade_reasons": [
+        "Signal score 35/100 is below minimum 75/100"
+      ]
+    }
+  ]
+}

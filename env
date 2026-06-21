@@ -1,0 +1,23 @@
+# Alice Blue API (LIVE secret — gitignored; ROTATE this App Secret after testing)
+ALICE_APP_KEY=owwpG05w94
+ALICE_APP_SECRET=xMbbOAB8J5EaoyPLQnnTgg1UsOMA0qiTtvCVGLAlPqtGyjXIDarDogVnzbf9hQooKmZtWOGEBjnAo4zv1SW0QKENoAAfzp4vzGds
+ALICE_REDIRECT_URL=https://trade.animazon.in
+# Still required for pya3 session login (fill these in):
+ALICE_USER_ID=695846
+ALICE_API_KEY=owwpG05w94
+
+# Upstox API (LIVE secret — gitignored; ROTATE after testing). App "Backtest".
+# Has historical candles for EXPIRED F&O (expired-option backfill source).
+UPSTOX_API_KEY=803ffbe6-fbb2-4626-b155-3c02878a5aab
+UPSTOX_API_SECRET=0op64wp0hy
+UPSTOX_REDIRECT_URL=https://trade.animazon.in
+
+# Angel One SmartAPI
+ANGELONE_API_KEY=1Emb7eeW
+ANGELONE_CLIENT_CODE=N264222
+ANGELONE_PIN=0611
+ANGELONE_TOTP_SECRET=UEODXCCHWESSBI6PX7SXUAHCAA
+
+# Paths
+DATA_DIR=./data
+LAKE_DIR=./data/lake

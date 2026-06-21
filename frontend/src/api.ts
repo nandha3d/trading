@@ -13,6 +13,10 @@ import type {
   GridRequest,
   GridResponse,
   FlowLiveResponse,
+  OiStrategySignalRequest,
+  OiStrategySignalResponse,
+  OiStrategyBacktestRequest,
+  OiStrategyBacktestResponse,
 } from "./types";
 
 const BASE = "/api";
@@ -32,6 +36,24 @@ export async function runBacktest(req: BacktestRequest): Promise<BacktestRespons
     body: JSON.stringify(req),
   });
   return _json<BacktestResponse>(res);
+}
+
+export async function detectOiStrategySignal(req: OiStrategySignalRequest): Promise<OiStrategySignalResponse> {
+  const res = await fetch(`${BASE}/oi-strategy/signal`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  return _json<OiStrategySignalResponse>(res);
+}
+
+export async function runOiStrategyBacktest(req: OiStrategyBacktestRequest): Promise<OiStrategyBacktestResponse> {
+  const res = await fetch(`${BASE}/oi-strategy/backtest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  });
+  return _json<OiStrategyBacktestResponse>(res);
 }
 
 export async function runPayoff(req: PayoffRequest): Promise<PayoffResponse> {
