@@ -227,6 +227,16 @@ export default function OptionsChain() {
   useEffect(() => {
     localStorage.setItem("oc_legs", JSON.stringify(legs));
   }, [legs]);
+  // Workspace renders ~1000px below the chain table — auto-scroll to it on the
+  // 0 → >0 transition so adding the first leg doesn't look like a no-op.
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const prevLegsCount = useRef(legs.length);
+  useEffect(() => {
+    if (prevLegsCount.current === 0 && legs.length > 0) {
+      workspaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    prevLegsCount.current = legs.length;
+  }, [legs.length]);
   const [expandedLegs, setExpandedLegs] = useState<Set<string>>(new Set());
   const toggleLegExpand = (id: string) =>
     setExpandedLegs(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
@@ -1490,7 +1500,7 @@ export default function OptionsChain() {
 
       {/* ══ TRADE SIMULATOR WORKSPACE ════════════════════════════════════════ */}
       {legs.length > 0 && (
-        <div style={{ border: "1px solid var(--ts-border)", background: "var(--ts-bg-card)", borderRadius: "18px", overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.5)" }}>
+        <div ref={workspaceRef} style={{ border: "1px solid var(--ts-border)", background: "var(--ts-bg-card)", borderRadius: "18px", overflow: "hidden", boxShadow: "0 24px 64px rgba(0,0,0,0.5)" }}>
 
           {/* Header */}
           <div style={{ background: "var(--ts-bg-elevated)", borderBottom: "1px solid var(--ts-border)" }}
