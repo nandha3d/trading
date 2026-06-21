@@ -841,6 +841,22 @@ export default function OptionsChain() {
 
   return (
     <div className="flex flex-col h-full gap-6">
+      {legs.length > 0 && (
+        <div
+          onClick={() => workspaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          style={{
+            position: "fixed", bottom: 24, right: 24, zIndex: 100,
+            background: "var(--ts-accent)", color: "#fff",
+            padding: "10px 20px", borderRadius: 999,
+            fontSize: 13, fontWeight: 700, cursor: "pointer",
+            boxShadow: "0 8px 28px rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", gap: 8,
+            userSelect: "none",
+          }}
+        >
+          📊 {legs.length} Leg{legs.length > 1 ? "s" : ""} — View Strategy ↓
+        </div>
+      )}
       {error && (
         <div className="bg-red-900/20 border border-red-500/40 text-red-300 px-4 py-3 rounded-xl text-xs flex justify-between items-center">
           <span>{error}</span>
