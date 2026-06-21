@@ -227,16 +227,17 @@ export default function OptionsChain() {
   useEffect(() => {
     localStorage.setItem("oc_legs", JSON.stringify(legs));
   }, [legs]);
-  // Workspace renders ~1000px below the chain table — auto-scroll to it on the
-  // 0 → >0 transition so adding the first leg doesn't look like a no-op.
+  // Workspace renders ~1000px below the chain table — auto-scroll to it whenever
+  // a leg is actually added (flag set in addLeg), not just on a 0->>0 transition,
+  // since legs are now persisted and that transition rarely happens after the first use.
   const workspaceRef = useRef<HTMLDivElement>(null);
-  const prevLegsCount = useRef(legs.length);
+  const scrollPendingRef = useRef(false);
   useEffect(() => {
-    if (prevLegsCount.current === 0 && legs.length > 0) {
+    if (scrollPendingRef.current) {
+      scrollPendingRef.current = false;
       workspaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-    prevLegsCount.current = legs.length;
-  }, [legs.length]);
+  }, [legs]);
   const [expandedLegs, setExpandedLegs] = useState<Set<string>>(new Set());
   const toggleLegExpand = (id: string) =>
     setExpandedLegs(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
@@ -610,6 +611,7 @@ export default function OptionsChain() {
       sl_enabled: false, sl_pct: 50,
       tp_enabled: false, tp_pct: 50,
     };
+    scrollPendingRef.current = true;
     setLegs((prev) => [...prev, newLeg]);
   };
 
