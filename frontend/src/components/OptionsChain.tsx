@@ -1531,6 +1531,20 @@ export default function OptionsChain() {
                   SPOT {fmtPrice(spotPrice)}
                 </span>
               )}
+              {(() => {
+                const tp = legs.reduce((s, l) => { const p = getLegPnl(data, l); return p !== null ? s + p : s; }, 0);
+                if (!legs.some(l => getLegPnl(data, l) !== null)) return null;
+                return (
+                  <span style={{
+                    marginLeft: "10px", padding: "3px 10px", borderRadius: "8px",
+                    background: tp >= 0 ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)",
+                    color: tp >= 0 ? "var(--ts-profit)" : "var(--ts-loss)",
+                    fontFamily: "monospace", fontSize: "14px", fontWeight: 900,
+                  }}>
+                    P&L {tp >= 0 ? "+" : ""}₹{Math.round(tp).toLocaleString("en-IN")}
+                  </span>
+                );
+              })()}
             </div>
             <div className="flex items-center gap-2 ml-auto flex-wrap">
               <input
@@ -1721,6 +1735,17 @@ export default function OptionsChain() {
                             </span>
                           )}
                         </div>
+                        {/* Entry → Exit time — click to edit in SL/TP accordion */}
+                        <div className="flex items-center gap-1 flex-shrink-0" style={{ borderLeft: "1px solid var(--ts-border)", paddingLeft: "8px", cursor: "pointer" }}
+                          onClick={() => toggleLegExpand(leg.id)} title="Entry / Exit schedule — click to edit">
+                          <span style={{ color: entryPassed ? "var(--ts-buy-text)" : "var(--ts-muted)", fontFamily: "monospace", fontSize: "12px", fontWeight: 700 }}>
+                            {leg.entry_time ?? "09:15"}
+                          </span>
+                          <span style={{ color: "var(--ts-muted)", fontSize: "11px" }}>→</span>
+                          <span style={{ color: exitPassed ? "var(--ts-loss)" : "var(--ts-text-secondary)", fontFamily: "monospace", fontSize: "12px", fontWeight: 700 }}>
+                            {leg.exit_time ?? "15:25"}
+                          </span>
+                        </div>
 
                         {/* Status badges */}
                         {legSlHit && <span style={{ color: "var(--ts-loss)", background: "rgba(239,68,68,0.12)", borderRadius: "4px", fontSize: "10px", padding: "2px 6px", fontWeight: 700, flexShrink: 0 }} className="animate-pulse">SL HIT</span>}
@@ -1825,14 +1850,16 @@ export default function OptionsChain() {
                 })}
               </div>
 
-              {/* Live total P&L footer */}
-              {isLive && (() => {
+              {/* Total current P&L footer (sum of per-leg LTP vs entry) */}
+              {(() => {
                 const totalPnl = legs.reduce((sum, l) => { const p = getLegPnl(data, l); return p !== null ? sum + p : sum; }, 0);
                 if (!legs.some(l => getLegPnl(data, l) !== null)) return null;
                 return (
                   <div style={{ borderTop: "1px solid var(--ts-border)", background: totalPnl >= 0 ? "rgba(16,185,129,0.06)" : "rgba(239,68,68,0.06)" }}
                     className="px-4 py-2.5 flex items-center justify-between">
-                    <span style={{ color: "var(--ts-muted)", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>Paper P&L</span>
+                    <span style={{ color: "var(--ts-muted)", fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                      {isLive ? "Paper P&L" : "Current P&L"}
+                    </span>
                     <span style={{ color: totalPnl >= 0 ? "var(--ts-profit)" : "var(--ts-loss)", fontFamily: "monospace", fontSize: "17px", fontWeight: 900 }}>
                       {totalPnl >= 0 ? "+" : ""}₹{Math.round(totalPnl).toLocaleString("en-IN")}
                     </span>
