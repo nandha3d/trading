@@ -1644,16 +1644,16 @@ export default function OptionsChain() {
                         cursor: "grab",
                       }}
                     >
-                      {/* Card header */}
+                      {/* Slim leg strip — all fields inline, accordion holds SL/TP/Schedule */}
                       <div style={{ background: isBuy ? "var(--ts-buy-bg)" : "var(--ts-sell-bg)" }}
-                        className="flex items-center gap-2 px-3 py-2.5">
+                        className="flex items-center gap-x-2 gap-y-1 px-3 py-2 flex-wrap">
                         <span style={{ color: "var(--ts-muted)", fontSize: "18px", lineHeight: 1, userSelect: "none", flexShrink: 0 }}>⠿</span>
                         <button onClick={() => handleToggleAction(leg.id)}
                           style={{
                             background: isBuy ? "rgba(16,185,129,0.18)" : "rgba(239,68,68,0.18)",
                             color: isBuy ? "var(--ts-buy-text)" : "var(--ts-sell-text)",
                             border: `2px solid ${isBuy ? "var(--ts-buy-border)" : "var(--ts-sell-border)"}`,
-                            width: "28px", height: "28px", borderRadius: "7px", flexShrink: 0,
+                            width: "26px", height: "26px", borderRadius: "7px", flexShrink: 0,
                             fontWeight: 900, fontSize: "13px", cursor: "pointer",
                             display: "flex", alignItems: "center", justifyContent: "center",
                           }}>{isBuy ? "B" : "S"}</button>
@@ -1662,8 +1662,8 @@ export default function OptionsChain() {
                             onChange={e => handleRetarget(leg.id, { strike: Number(e.target.value) })}
                             style={{
                               background: "transparent", color: "var(--ts-text)", border: "none", outline: "none",
-                              fontSize: "15px", fontWeight: 700, fontFamily: "monospace", cursor: "pointer",
-                              flex: 1, minWidth: 0,
+                              fontSize: "14px", fontWeight: 700, fontFamily: "monospace", cursor: "pointer",
+                              flexShrink: 0,
                             }}>
                             {strikeOpts.map(s => (
                               <option key={s} value={s} style={{ background: "#1a1e2b" }}>{s}</option>
@@ -1674,76 +1674,74 @@ export default function OptionsChain() {
                             onChange={e => handleRetarget(leg.id, { strike: Number(e.target.value) })}
                             style={{
                               background: "transparent", color: "var(--ts-text)", border: "none", outline: "none",
-                              fontSize: "15px", fontWeight: 700, fontFamily: "monospace", flex: 1, minWidth: 0,
+                              fontSize: "14px", fontWeight: 700, fontFamily: "monospace", width: "72px",
                             }} />
                         )}
                         <select value={leg.opt_type}
                           onChange={e => handleRetarget(leg.id, { opt_type: e.target.value as "CE" | "PE" })}
-                          style={{ background: "transparent", border: "none", outline: "none", cursor: "pointer", fontSize: "13px", fontWeight: 700,
+                          style={{ background: "transparent", border: "none", outline: "none", cursor: "pointer", fontSize: "13px", fontWeight: 700, flexShrink: 0,
                             color: leg.opt_type === "CE" ? "var(--ts-sell-text)" : "var(--ts-buy-text)" }}>
                           <option value="CE" style={{ background: "#1a1e2b" }}>CE</option>
                           <option value="PE" style={{ background: "#1a1e2b" }}>PE</option>
                         </select>
                         <select value={leg.expiry || (isLive ? liveExpiry : selectedExpiry)}
                           onChange={e => handleUpdateLeg(leg.id, { expiry: e.target.value })}
-                          style={{ background: "transparent", border: "none", outline: "none", cursor: "pointer",
+                          style={{ background: "transparent", border: "none", outline: "none", cursor: "pointer", flexShrink: 0,
                             color: "var(--ts-warning)", fontSize: "11px", fontFamily: "monospace" }}>
                           {availableExpiries.map(exp => (
                             <option key={exp} value={exp} style={{ background: "#1a1e2b" }}>{exp.slice(5)}</option>
                           ))}
                         </select>
-                        <input type="checkbox" checked={leg.visible} onChange={() => handleToggleVisible(leg.id)}
-                          title="Include in payoff chart"
-                          style={{ accentColor: "var(--ts-accent)", width: "14px", height: "14px", cursor: "pointer", flexShrink: 0 }} />
-                        <button onClick={() => handleRemoveLeg(leg.id)}
-                          style={{ color: "var(--ts-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "15px", lineHeight: 1, padding: "2px 0", flexShrink: 0 }}
-                          className="hover:text-red-400 transition-colors">✖</button>
-                      </div>
 
-                      {/* Card body: Lots | Entry ₹ | LTP / P&L */}
-                      <div className="grid grid-cols-3" style={{ borderTop: "1px solid var(--ts-border)" }}>
-                        <div className="px-3 py-2" style={{ borderRight: "1px solid var(--ts-border)" }}>
-                          <div style={{ color: "var(--ts-muted)", fontSize: "10px", marginBottom: "3px" }}>Lots</div>
+                        {/* Lots */}
+                        <div className="flex items-center gap-1 flex-shrink-0" style={{ borderLeft: "1px solid var(--ts-border)", paddingLeft: "8px" }}>
+                          <span style={{ color: "var(--ts-muted)", fontSize: "10px" }}>Lots</span>
                           <input type="number" min="1" value={leg.lots}
                             onChange={e => handleUpdateLeg(leg.id, { lots: Math.max(1, Number(e.target.value)) })}
                             style={{ background: "transparent", color: "var(--ts-text)", border: "none", outline: "none",
-                              width: "48px", textAlign: "center", fontWeight: 700, fontSize: "14px" }} />
+                              width: "34px", textAlign: "center", fontWeight: 700, fontSize: "13px" }} />
                         </div>
-                        <div className="px-3 py-2" style={{ borderRight: "1px solid var(--ts-border)" }}>
-                          <div style={{ color: "var(--ts-muted)", fontSize: "10px", marginBottom: "3px" }}>Entry ₹</div>
+                        {/* Entry */}
+                        <div className="flex items-center gap-1 flex-shrink-0" style={{ borderLeft: "1px solid var(--ts-border)", paddingLeft: "8px" }}>
+                          <span style={{ color: "var(--ts-muted)", fontSize: "10px" }}>Entry</span>
                           <input type="number" step="0.05" value={leg.entry_price}
                             onChange={e => handleUpdateLeg(leg.id, { entry_price: Number(e.target.value) })}
                             style={{ background: "transparent", color: "var(--ts-text)", border: "none", outline: "none",
-                              width: "72px", textAlign: "right", fontFamily: "monospace", fontWeight: 700, fontSize: "14px" }} />
+                              width: "58px", textAlign: "right", fontFamily: "monospace", fontWeight: 700, fontSize: "13px" }} />
                         </div>
-                        <div className="px-3 py-2">
-                          <div style={{ color: "var(--ts-muted)", fontSize: "10px", marginBottom: "3px" }}>LTP / P&L</div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span style={{ color: "var(--ts-text)", fontFamily: "monospace", fontWeight: 700, fontSize: "13px" }}>
-                              {currentLtp !== null ? currentLtp.toFixed(2) : "—"}
+                        {/* LTP / P&L */}
+                        <div className="flex items-center gap-1.5 flex-shrink-0" style={{ borderLeft: "1px solid var(--ts-border)", paddingLeft: "8px" }}>
+                          <span style={{ color: "var(--ts-muted)", fontSize: "10px" }}>LTP</span>
+                          <span style={{ color: "var(--ts-text)", fontFamily: "monospace", fontWeight: 700, fontSize: "13px" }}>
+                            {currentLtp !== null ? currentLtp.toFixed(2) : "—"}
+                          </span>
+                          {pnl !== null && (
+                            <span style={{ color: pnl >= 0 ? "var(--ts-profit)" : "var(--ts-loss)", fontSize: "11px", fontWeight: 700 }}>
+                              {pnl >= 0 ? "+" : ""}₹{Math.round(pnl).toLocaleString("en-IN")}
                             </span>
-                            {pnl !== null && (
-                              <span style={{ color: pnl >= 0 ? "var(--ts-profit)" : "var(--ts-loss)", fontSize: "11px", fontWeight: 700 }}>
-                                {pnl >= 0 ? "+" : ""}₹{Math.round(pnl).toLocaleString("en-IN")}
-                              </span>
-                            )}
-                          </div>
+                          )}
                         </div>
-                      </div>
 
-                      {/* Expand footer */}
-                      <div style={{ borderTop: "1px solid var(--ts-border)", background: "var(--ts-bg-base)" }}
-                        className="px-3 py-1.5 flex items-center justify-between">
-                        <button onClick={() => toggleLegExpand(leg.id)}
-                          style={{ color: "var(--ts-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "11px" }}
-                          className="hover:text-white transition-colors">
-                          {isExpanded ? "▲ Hide SL/TP" : "▼ SL / TP / Schedule"}
-                        </button>
-                        <div className="flex items-center gap-2">
-                          {legSlHit && <span style={{ color: "var(--ts-loss)", background: "rgba(239,68,68,0.12)", borderRadius: "4px", fontSize: "10px", padding: "2px 6px", fontWeight: 700 }} className="animate-pulse">SL HIT</span>}
-                          {legTpHit && <span style={{ color: "var(--ts-profit)", background: "rgba(16,185,129,0.12)", borderRadius: "4px", fontSize: "10px", padding: "2px 6px", fontWeight: 700 }} className="animate-pulse">TP HIT</span>}
-                          {!entryPassed && !legSlHit && !legTpHit && <span style={{ color: "var(--ts-warning)", fontSize: "11px", fontWeight: 700 }}>⏳</span>}
-                          {exitPassed && !legSlHit && !legTpHit && <span style={{ color: "var(--ts-muted)", fontSize: "11px", fontWeight: 700 }}>⏹</span>}
+                        {/* Status badges */}
+                        {legSlHit && <span style={{ color: "var(--ts-loss)", background: "rgba(239,68,68,0.12)", borderRadius: "4px", fontSize: "10px", padding: "2px 6px", fontWeight: 700, flexShrink: 0 }} className="animate-pulse">SL HIT</span>}
+                        {legTpHit && <span style={{ color: "var(--ts-profit)", background: "rgba(16,185,129,0.12)", borderRadius: "4px", fontSize: "10px", padding: "2px 6px", fontWeight: 700, flexShrink: 0 }} className="animate-pulse">TP HIT</span>}
+                        {!entryPassed && !legSlHit && !legTpHit && <span style={{ color: "var(--ts-warning)", fontSize: "11px", fontWeight: 700, flexShrink: 0 }}>⏳</span>}
+                        {exitPassed && !legSlHit && !legTpHit && <span style={{ color: "var(--ts-muted)", fontSize: "11px", fontWeight: 700, flexShrink: 0 }}>⏹</span>}
+
+                        {/* Right-aligned controls */}
+                        <div className="flex items-center gap-2 flex-shrink-0" style={{ marginLeft: "auto" }}>
+                          <button onClick={() => toggleLegExpand(leg.id)}
+                            title="SL / TP / Schedule"
+                            style={{ color: "var(--ts-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "11px", flexShrink: 0 }}
+                            className="hover:text-white transition-colors">
+                            {isExpanded ? "▲ SL/TP" : "▼ SL/TP"}
+                          </button>
+                          <input type="checkbox" checked={leg.visible} onChange={() => handleToggleVisible(leg.id)}
+                            title="Include in payoff chart"
+                            style={{ accentColor: "var(--ts-accent)", width: "14px", height: "14px", cursor: "pointer", flexShrink: 0 }} />
+                          <button onClick={() => handleRemoveLeg(leg.id)}
+                            style={{ color: "var(--ts-muted)", background: "none", border: "none", cursor: "pointer", fontSize: "15px", lineHeight: 1, padding: "2px 0", flexShrink: 0 }}
+                            className="hover:text-red-400 transition-colors">✖</button>
                         </div>
                       </div>
 
