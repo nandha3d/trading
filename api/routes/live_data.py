@@ -337,8 +337,18 @@ class _CachedSnapshot:
 
 
 def _acquire_source(underlying: str, expiry: str):
-    """Upstox preferred; Angel One fallback; last snapshot if both fail."""
-    # 1. Upstox (REST, no WS session required)
+    """Angel One preferred (fully automatic); Upstox fallback; last snapshot if both fail."""
+    # 1. Angel One (Auto TOTP login)
+    if settings.angelone_ready:
+        try:
+            from src.data.angelone_feed import get_feed
+            feed = get_feed(underlying, expiry)
+            logger.info("Using Angel One feed for %s %s", underlying, expiry)
+            return feed, True
+        except Exception as e:
+            logger.warning("Angel One unavailable (%s); trying Upstox", e)
+            
+    # 2. Upstox (REST, requires daily manual oauth)
     if _upstox_token():
         try:
             today_str = date.today().isoformat()
@@ -347,16 +357,8 @@ def _acquire_source(underlying: str, expiry: str):
             logger.info("Using Upstox live chain for %s %s", underlying, live_expiry)
             return src, True
         except Exception as e:
-            logger.warning("Upstox source init failed (%s); trying Angel One", e)
-    # 2. Angel One
-    if settings.angelone_ready:
-        try:
-            from src.data.angelone_feed import get_feed
-            feed = get_feed(underlying, expiry)
-            logger.info("Using Angel One feed for %s %s", underlying, expiry)
-            return feed, True
-        except Exception as e:
-            logger.warning("Angel One unavailable (%s); serving snapshot", e)
+            logger.warning("Upstox source init failed (%s); serving snapshot", e)
+            
     # 3. Last cached snapshot
     return _CachedSnapshot(underlying, expiry), True
 
