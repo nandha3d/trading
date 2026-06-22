@@ -82,7 +82,7 @@ export default function App() {
 
       {/* All tabs stay mounted — only visibility toggles. State (legs, payoff, WS) survives navigation. */}
       <div className={`flex-1 overflow-y-auto p-6 bg-gray-950 ${tab !== "oi-matrix" ? "hidden" : ""}`}>
-        <FlowMatrix />
+        <FlowMatrix isActive={tab === "oi-matrix"} />
       </div>
 
       <div className={`flex flex-1 overflow-hidden ${tab !== "backtest" ? "hidden" : ""}`}>
@@ -108,7 +108,7 @@ export default function App() {
         <GridSweep />
       </div>
       <div className={`flex-1 overflow-y-auto p-6 bg-gray-950 ${tab !== "chain" ? "hidden" : ""}`}>
-        <OptionsChain />
+        <OptionsChain isActive={tab === "chain"} />
       </div>
     </div>
   );

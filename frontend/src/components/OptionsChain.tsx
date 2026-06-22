@@ -134,7 +134,7 @@ function computeLiveExpiries(underlying: string): string[] {
   return results;
 }
 
-export default function OptionsChain() {
+export default function OptionsChain({ isActive = true }: { isActive?: boolean }) {
   const [underlying, setUnderlying] = useState<"NIFTY" | "BANKNIFTY">(
     () => (localStorage.getItem("oc_underlying") as "NIFTY" | "BANKNIFTY") ?? "NIFTY"
   );
@@ -395,8 +395,11 @@ export default function OptionsChain() {
 
   // 4. Connect to Live WebSocket stream (when Go Live is toggled)
   useEffect(() => {
-    if (!isLive || !liveExpiry) {
-      wsRef.current?.close();
+    if (!isActive || !isLive || !liveExpiry) {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
       return;
     }
 
@@ -424,8 +427,13 @@ export default function OptionsChain() {
       if (isLive) setTimeout(() => setWsReconnect(n => n + 1), 3000);
     };
 
-    return () => { ws.close(); };
-  }, [isLive, underlying, liveExpiry, wsReconnect]);
+    return () => { 
+      if (wsRef.current) {
+        wsRef.current.close(); 
+        wsRef.current = null;
+      }
+    };
+  }, [isActive, isLive, underlying, liveExpiry, wsReconnect]);
 
   const spotPrice = data?.spot_price ?? null;
 

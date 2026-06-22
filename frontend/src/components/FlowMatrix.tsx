@@ -66,7 +66,7 @@ function chg(n: number) {
   return <span className={n > 0 ? "text-emerald-400" : n < 0 ? "text-red-400" : "text-gray-500"}>{n > 0 ? "+" : ""}{n.toLocaleString("en-IN")}</span>;
 }
 
-export default function FlowMatrix() {
+export default function FlowMatrix({ isActive = true }: { isActive?: boolean }) {
   const todayISO = () => new Date().toISOString().slice(0, 10);
 
   const [sub, setSub] = useState<Sub>("dots");
@@ -101,7 +101,7 @@ export default function FlowMatrix() {
   }, [mode]);
 
   useEffect(() => {
-    if (mode !== "live" || sub !== "dots") {
+    if (!isActive || mode !== "live" || sub !== "dots") {
       if (livePoll.current) { clearInterval(livePoll.current); livePoll.current = null; }
       return;
     }
@@ -114,7 +114,7 @@ export default function FlowMatrix() {
     tick();
     livePoll.current = setInterval(tick, 4000);
     return () => { cancelled = true; if (livePoll.current) { clearInterval(livePoll.current); livePoll.current = null; } };
-  }, [mode, underlying, sub]);
+  }, [isActive, mode, underlying, sub]);
 
   useEffect(() => {
     getFlowDates(underlying).then((d) => {
@@ -192,6 +192,10 @@ export default function FlowMatrix() {
 
   // Auto-run + poll when in live mode and expiry (+ strike for oi) ready
   useEffect(() => {
+    if (!isActive) {
+      if (toolPoll.current) { clearInterval(toolPoll.current); toolPoll.current = null; }
+      return;
+    }
     if (mode !== "live" || sub === "dots" || sub === "risk" || sub === "fii") return;
     if (!expiry) return;
     if (sub === "oi" && strike === "") return;
@@ -200,7 +204,7 @@ export default function FlowMatrix() {
     toolPoll.current = setInterval(go, 30000);
     return () => { if (toolPoll.current) { clearInterval(toolPoll.current); toolPoll.current = null; } };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, sub, underlying, expiry, strike, interval]);
+  }, [isActive, mode, sub, underlying, expiry, strike, interval]);
 
   return (
     <div className="space-y-4">
