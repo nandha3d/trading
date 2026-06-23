@@ -108,10 +108,13 @@ export interface BacktestRequest {
   underlying: "NIFTY" | "BANKNIFTY";
   start: string;
   end: string;
+  strategy_type?: "CUSTOM" | "OI";
   entry_time: string;
   exit_time: string;
   legs: LegSpec[];
   expiry_offset: number;
+  oi_interval?: number;
+  oi_config?: OiStrategyConfigOverrides;
   exit_conditions?: ExitConditionsConfig;
   entry_conditions?: EntryConditionsConfig;
   indicators?: IndicatorDef[];
@@ -161,6 +164,8 @@ export interface BacktestResponse {
   equity_curve: number[];
   skipped_days: number;
   run_id?: string;
+  strategy_type?: "CUSTOM" | "OI" | string | null;
+  oi_analytics?: Record<string, any>;
 }
 
 // ---- OI Strategy Signal Detector ----
@@ -201,6 +206,15 @@ export interface OiStrategyConfigOverrides {
   theta_exit_profile?: string;
   expiry_day_tightening?: boolean;
   require_factor_coverage_percent?: number;
+  active_factors?: string[];
+  required_factors?: string[];
+  run_ablation_study?: boolean;
+  ablation_trailing_sl_values?: number[];
+  qualification_gates?: {
+    max_p_value: number;
+    min_profit_factor: number;
+    min_trades: number;
+  };
 }
 
 export interface OiStrategySignalRequest {
@@ -296,6 +310,8 @@ export interface OiStrategyBacktestStats {
   avg_win: number;
   avg_loss: number;
   max_drawdown: number;
+  recovery_factor: number;
+  return_to_mdd_ratio: number;
   expectancy: number;
   sharpe: number;
   sortino: number;
@@ -356,6 +372,12 @@ export interface OiStrategyBacktestResponse {
   trade_journal: Record<string, unknown>[];
   baseline_comparison: Record<string, any>;
   cost_sensitivity: Record<string, any>[];
+  drawdown_analysis: Record<string, any>;
+  trade_quality: Record<string, any>;
+  timing_analysis: Record<string, any>;
+  monte_carlo: Record<string, any>;
+  statistical_significance: Record<string, any>;
+  sample_size_warning: Record<string, any>;
   regime_summary: Record<string, any>[];
   factor_summary: Record<string, any>[];
   walk_forward_summary: Record<string, any>[];

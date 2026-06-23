@@ -90,10 +90,13 @@ class BacktestRequest(BaseModel):
     underlying: str = "NIFTY"
     start: date
     end: date
+    strategy_type: str = "CUSTOM"
     entry_time: str = "09:20"
     exit_time: str = "15:15"
     legs: list[LegSpec]
     expiry_offset: int = 0
+    oi_interval: int = 5
+    oi_config: dict[str, Any] = Field(default_factory=dict)
     exit_conditions: ExitConditions = Field(default_factory=ExitConditions)
     entry_conditions: EntryConditions = Field(default_factory=EntryConditions)
     # Quantman-style indicator + condition engine (optional; empty = legacy behaviour)
@@ -144,6 +147,8 @@ class BacktestResponse(BaseModel):
     equity_curve: list[float]
     skipped_days: int = 0
     run_id: Optional[str] = None
+    strategy_type: Optional[str] = None
+    oi_analytics: dict[str, Any] = Field(default_factory=dict)
 
 
 # ---- OI strategy signal detector ----
@@ -247,6 +252,8 @@ class OiStrategyBacktestStats(BaseModel):
     avg_win: float
     avg_loss: float
     max_drawdown: float
+    recovery_factor: float = 0.0
+    return_to_mdd_ratio: float = 0.0
     expectancy: float = 0.0
     sharpe: float = 0.0
     sortino: float = 0.0
@@ -307,9 +314,21 @@ class OiStrategyBacktestResponse(BaseModel):
     trade_journal: list[dict[str, Any]] = Field(default_factory=list)
     baseline_comparison: dict[str, Any] = Field(default_factory=dict)
     cost_sensitivity: list[dict[str, Any]] = Field(default_factory=list)
+    drawdown_analysis: dict[str, Any] = Field(default_factory=dict)
+    trade_quality: dict[str, Any] = Field(default_factory=dict)
+    timing_analysis: dict[str, Any] = Field(default_factory=dict)
+    monte_carlo: dict[str, Any] = Field(default_factory=dict)
+    statistical_significance: dict[str, Any] = Field(default_factory=dict)
+    sample_size_warning: dict[str, Any] = Field(default_factory=dict)
     regime_summary: list[dict[str, Any]] = Field(default_factory=list)
     factor_summary: list[dict[str, Any]] = Field(default_factory=list)
     walk_forward_summary: list[dict[str, Any]] = Field(default_factory=list)
+    ablation_study: list[dict[str, Any]] = Field(default_factory=list)
+    trailing_sl_study: list[dict[str, Any]] = Field(default_factory=list)
+    oi_marginal_contribution: dict[str, Any] = Field(default_factory=dict)
+    paired_comparison: dict[str, Any] = Field(default_factory=dict)
+    research_verdict: dict[str, Any] = Field(default_factory=dict)
+    ablation_gates: dict[str, Any] = Field(default_factory=dict)
     data_quality: dict[str, Any]
     config: dict[str, Any]
 

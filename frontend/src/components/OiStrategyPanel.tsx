@@ -10,6 +10,15 @@ interface Props {
 
 const rowCls = "flex items-center justify-between gap-3 text-[10px] py-1 border-b border-gray-900 last:border-0";
 const metricCls = "bg-gray-900/70 rounded-lg p-2 min-w-0";
+const sectionCls = "bg-gray-900/40 rounded-xl px-2 py-2 space-y-1";
+
+function HelpBox({ title, children }: { title: string; children: string }) {
+  return (
+    <div className="text-[10px] leading-relaxed text-sky-200 bg-sky-950/20 border border-sky-900/60 rounded-lg px-2 py-1.5">
+      <span className="font-bold text-sky-300">{title}: </span>{children}
+    </div>
+  );
+}
 
 export default function OiStrategyPanel({ underlying, defaultDate, onLoadSuggested }: Props) {
   const [date, setDate] = useState(defaultDate);
@@ -23,6 +32,12 @@ export default function OiStrategyPanel({ underlying, defaultDate, onLoadSuggest
   const [error, setError] = useState<string | null>(null);
   const [btStart, setBtStart] = useState(defaultDate);
   const [btEnd, setBtEnd] = useState(defaultDate);
+
+  const setSignalDate = (nextDate: string) => {
+    setDate(nextDate);
+    if (btStart === date) setBtStart(nextDate);
+    if (btEnd === date) setBtEnd(nextDate);
+  };
 
   const run = async () => {
     setLoading(true);
@@ -68,6 +83,9 @@ export default function OiStrategyPanel({ underlying, defaultDate, onLoadSuggest
 
   const fmt = (n: number) =>
     n.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 0 });
+  const pct = (n: number) =>
+    `${n.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 0 })}%`;
+  const getNum = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? value : 0;
   const factors = result?.factor_scores?.length ? result.factor_scores : result?.score_breakdown ?? [];
   const download = (name: string, content: string, type: string) => {
     const blob = new Blob([content], { type });
@@ -106,7 +124,7 @@ export default function OiStrategyPanel({ underlying, defaultDate, onLoadSuggest
         <div>
           <div className="text-xs font-semibold text-gray-300">OI Strategy</div>
           <div className="text-[10px] text-gray-500 mt-0.5">
-            Backtest/paper signal only. Score shows rule confluence, not profit probability.
+            One OI workflow for setup detection and research scanning. Score shows rule confluence, not profit probability.
           </div>
         </div>
         {result && (
@@ -124,7 +142,7 @@ export default function OiStrategyPanel({ underlying, defaultDate, onLoadSuggest
           <input
             type="date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => setSignalDate(e.target.value)}
             className="w-full bg-gray-950 border border-gray-800 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500"
           />
         </label>
@@ -169,6 +187,10 @@ export default function OiStrategyPanel({ underlying, defaultDate, onLoadSuggest
         {loading ? "Detecting OI setup..." : "Detect OI Setup"}
       </button>
 
+      <HelpBox title="How this connects">
+        Detect Setup finds one OI signal and can load its BUY CE/PE leg into the normal Strategy Builder. The main Run Backtest then tests those legs with your selected indicators. The research scan below is the OI-gated backtest that checks every candle.
+      </HelpBox>
+
       {error && (
         <div className="text-[10px] text-red-300 bg-red-950/30 border border-red-900 rounded-lg px-2 py-1.5">
           {error}
@@ -211,6 +233,10 @@ export default function OiStrategyPanel({ underlying, defaultDate, onLoadSuggest
             </div>
           )}
 
+          <HelpBox title="How to read the factor score">
+            The score is a checklist of market confirmations such as OI unwinding, VWAP, PCR, volume, trend, and time risk. It is not a profit probability.
+          </HelpBox>
+
           <div className="bg-gray-900/40 rounded-xl px-2">
             {factors.map((s) => (
               <div key={s.label} className={rowCls}>
@@ -234,20 +260,25 @@ export default function OiStrategyPanel({ underlying, defaultDate, onLoadSuggest
           </div>
 
           {result.suggested_legs.length > 0 && (
-            <button
-              type="button"
-              onClick={() => onLoadSuggested(result)}
-              className="w-full py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition-colors"
-            >
-              Load Suggested BUY {result.suggested_legs[0].opt_type} Leg
-            </button>
+            <div className="space-y-1.5">
+              <button
+                type="button"
+                onClick={() => onLoadSuggested(result)}
+                className="w-full py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition-colors"
+              >
+                Load Suggested BUY {result.suggested_legs[0].opt_type} Leg
+              </button>
+              <div className="text-[10px] text-gray-500 leading-relaxed">
+                After loading, use the main Run Backtest button to test this leg with your selected indicators, SL, target, entry rules, and exit rules.
+              </div>
+            </div>
           )}
         </div>
       )}
 
       <div className="border-t border-gray-800 pt-3 space-y-3">
         <div>
-          <div className="text-xs font-semibold text-gray-300">OI Backtester</div>
+          <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Research scan range</div>
           <div className="text-[10px] text-gray-500 mt-0.5">
             Scans every {interval}-minute candle, enters valid BUY CE/PE setups, and exits by SL, target, trailing SL, or time.
           </div>
@@ -280,7 +311,7 @@ export default function OiStrategyPanel({ underlying, defaultDate, onLoadSuggest
           disabled={btLoading}
           className="w-full py-2 rounded-lg bg-indigo-700 hover:bg-indigo-600 disabled:bg-gray-900 disabled:text-gray-600 text-white text-xs font-bold transition-colors"
         >
-          {btLoading ? "Running OI backtest..." : "Run OI Backtest"}
+          {btLoading ? "Scanning OI setups..." : "Run OI Research Scan"}
         </button>
 
         {backtest && (
@@ -316,9 +347,70 @@ export default function OiStrategyPanel({ underlying, defaultDate, onLoadSuggest
               </div>
             </div>
 
+            <HelpBox title="Main metrics">
+              Net P&L is after modeled costs, win rate shows how often trades finished positive, max DD is the worst peak-to-trough pain, Sharpe is risk-adjusted return, and baseline delta shows whether the OI filter beat a naive ATM option buyer.
+            </HelpBox>
+
+            {backtest.sample_size_warning?.message && (
+              <div className="text-[10px] leading-relaxed text-amber-200 bg-amber-950/30 border border-amber-800 rounded-lg px-2 py-1.5">
+                <span className="font-bold text-amber-300">Sample size warning: </span>
+                {String(backtest.sample_size_warning.message)}
+              </div>
+            )}
+
+            {backtest.baseline_comparison?.stats && (
+              <div className={sectionCls}>
+                <div className="text-[9px] uppercase text-gray-500 font-bold">Baseline Comparison</div>
+                <HelpBox title="Why this matters">
+                  This checks whether the OI filter improves on simply buying the same ATM CE/PE candidates. If the baseline is better, the filter may be removing good trades.
+                </HelpBox>
+                <div className={rowCls}>
+                  <span className="text-gray-400">Baseline net P&L</span>
+                  <span className={getNum(backtest.baseline_comparison.stats.net_pnl) >= 0 ? "text-emerald-300" : "text-red-300"}>{fmt(getNum(backtest.baseline_comparison.stats.net_pnl))}</span>
+                </div>
+                <div className={rowCls}>
+                  <span className="text-gray-400">Baseline win rate</span>
+                  <span className="text-gray-300">{pct(getNum(backtest.baseline_comparison.stats.win_rate))}</span>
+                </div>
+                <div className={rowCls}>
+                  <span className="text-gray-400">Baseline MDD</span>
+                  <span className="text-amber-300">{fmt(getNum(backtest.baseline_comparison.stats.max_drawdown))}</span>
+                </div>
+                <div className={rowCls}>
+                  <span className="text-gray-400">Baseline Sharpe / Sortino</span>
+                  <span className="text-gray-300">{fmt(getNum(backtest.baseline_comparison.stats.sharpe))} / {fmt(getNum(backtest.baseline_comparison.stats.sortino))}</span>
+                </div>
+              </div>
+            )}
+
+            {backtest.drawdown_analysis && Object.keys(backtest.drawdown_analysis).length > 0 && (
+              <div className={sectionCls}>
+                <div className="text-[9px] uppercase text-gray-500 font-bold">Drawdown Quality</div>
+                <HelpBox title="Survivability check">
+                  Drawdown is the pain between equity highs. Recovery factor compares total profit to worst drawdown; higher is healthier, while long drawdown duration is harder to sit through.
+                </HelpBox>
+                <div className={rowCls}>
+                  <span className="text-gray-400">Recovery factor</span>
+                  <span className="text-gray-300">{fmt(getNum(backtest.drawdown_analysis.recovery_factor))}</span>
+                </div>
+                <div className={rowCls}>
+                  <span className="text-gray-400">Average drawdown</span>
+                  <span className="text-amber-300">{fmt(getNum(backtest.drawdown_analysis.average_drawdown))}</span>
+                </div>
+                <div className={rowCls}>
+                  <span className="text-gray-400">MDD duration</span>
+                  <span className="text-gray-300">{fmt(getNum(backtest.drawdown_analysis.max_drawdown_duration_trades))} trades</span>
+                </div>
+              </div>
+            )}
+
             <div className="text-[10px] text-gray-500">
               Checked {backtest.checked_bars} bars; {backtest.no_trade_bars} bars were no-trade.
             </div>
+
+            <HelpBox title="Exports">
+              JSON contains the full research payload for audit. Journal CSV is easier for customers to review each trade, no-trade, factor reason, and exit.
+            </HelpBox>
 
             <div className="grid grid-cols-2 gap-2">
               <button type="button" onClick={exportResearchJson} className="py-1.5 rounded-lg bg-gray-900 hover:bg-gray-800 text-[10px] text-gray-300">
@@ -330,8 +422,11 @@ export default function OiStrategyPanel({ underlying, defaultDate, onLoadSuggest
             </div>
 
             {backtest.cost_sensitivity?.length > 0 && (
-              <div className="bg-gray-900/40 rounded-xl px-2">
+              <div className={sectionCls}>
                 <div className="text-[9px] uppercase text-gray-500 font-bold py-1">Cost Sensitivity</div>
+                <HelpBox title="Execution reality">
+                  This reruns P&L at lower and higher cost assumptions. A robust strategy should not disappear when costs are doubled.
+                </HelpBox>
                 {backtest.cost_sensitivity.map((c) => (
                   <div key={String(c.cost_multiplier)} className={rowCls}>
                     <span className="text-gray-400">{String(c.cost_multiplier)}x costs</span>
@@ -342,8 +437,11 @@ export default function OiStrategyPanel({ underlying, defaultDate, onLoadSuggest
             )}
 
             {backtest.regime_summary?.length > 0 && (
-              <div className="bg-gray-900/40 rounded-xl px-2">
+              <div className={sectionCls}>
                 <div className="text-[9px] uppercase text-gray-500 font-bold py-1">Regime Split</div>
+                <HelpBox title="When it works">
+                  This separates performance by trend, volatility proxy, and expiry status so one good market condition does not hide weak ones.
+                </HelpBox>
                 {backtest.regime_summary.slice(0, 4).map((r) => (
                   <div key={String(r.name)} className={rowCls}>
                     <span className="text-gray-400 truncate">{String(r.name)}</span>
@@ -352,6 +450,96 @@ export default function OiStrategyPanel({ underlying, defaultDate, onLoadSuggest
                 ))}
               </div>
             )}
+
+            {backtest.trade_quality && Object.keys(backtest.trade_quality).length > 0 && (
+              <div className={sectionCls}>
+                <div className="text-[9px] uppercase text-gray-500 font-bold py-1">Trade Quality</div>
+                <HelpBox title="Trade behavior">
+                  This shows whether profits come from targets, stops, or time exits, and whether losers are being held longer than winners.
+                </HelpBox>
+                <div className={rowCls}>
+                  <span className="text-gray-400">Payoff ratio</span>
+                  <span className="text-gray-300">{fmt(getNum(backtest.trade_quality.payoff_ratio))}</span>
+                </div>
+                <div className={rowCls}>
+                  <span className="text-gray-400">Winner / loser hold</span>
+                  <span className="text-gray-300">{fmt(getNum(backtest.trade_quality.avg_winner_holding_minutes))}m / {fmt(getNum(backtest.trade_quality.avg_loser_holding_minutes))}m</span>
+                </div>
+                <div className={rowCls}>
+                  <span className="text-gray-400">Skipped baseline net</span>
+                  <span className={getNum(backtest.trade_quality.skipped_baseline?.net_pnl) >= 0 ? "text-emerald-300" : "text-red-300"}>{fmt(getNum(backtest.trade_quality.skipped_baseline?.net_pnl))}</span>
+                </div>
+                {Object.entries(backtest.trade_quality.exit_reason_distribution ?? {}).slice(0, 4).map(([name, count]) => (
+                  <div key={name} className={rowCls}>
+                    <span className="text-gray-400">{name}</span>
+                    <span className="text-gray-300">{String(count)} exits</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {backtest.timing_analysis && Object.keys(backtest.timing_analysis).length > 0 && (
+              <div className={sectionCls}>
+                <div className="text-[9px] uppercase text-gray-500 font-bold py-1">Timing Analysis</div>
+                <HelpBox title="Timing behavior">
+                  This checks weekday, expiry-day, entry-time, and holding-duration buckets. Options often behave differently near expiry and around market open.
+                </HelpBox>
+                {(backtest.timing_analysis.expiry ?? []).slice(0, 3).map((r: Record<string, any>) => (
+                  <div key={String(r.name)} className={rowCls}>
+                    <span className="text-gray-400">{String(r.name)}</span>
+                    <span className={(r.net_pnl ?? 0) >= 0 ? "text-emerald-300" : "text-red-300"}>{fmt(r.net_pnl ?? 0)}</span>
+                  </div>
+                ))}
+                {(backtest.timing_analysis.entry_time ?? []).slice(0, 3).map((r: Record<string, any>) => (
+                  <div key={String(r.name)} className={rowCls}>
+                    <span className="text-gray-400">Entry {String(r.name)}</span>
+                    <span className={(r.net_pnl ?? 0) >= 0 ? "text-emerald-300" : "text-red-300"}>{fmt(r.net_pnl ?? 0)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {backtest.monte_carlo && Object.keys(backtest.monte_carlo).length > 0 && (
+              <div className={sectionCls}>
+                <div className="text-[9px] uppercase text-gray-500 font-bold py-1">Monte Carlo</div>
+                <HelpBox title="Bad-sequence risk">
+                  This resamples trade returns to estimate how bad drawdown could get if winners and losers arrive in a less friendly order.
+                </HelpBox>
+                <div className={rowCls}>
+                  <span className="text-gray-400">Historical MDD</span>
+                  <span className="text-amber-300">{fmt(getNum(backtest.monte_carlo.historical_mdd))}</span>
+                </div>
+                <div className={rowCls}>
+                  <span className="text-gray-400">MC MDD 95% / 99%</span>
+                  <span className="text-red-300">{fmt(getNum(backtest.monte_carlo.mdd_95))} / {fmt(getNum(backtest.monte_carlo.mdd_99))}</span>
+                </div>
+                <div className={rowCls}>
+                  <span className="text-gray-400">P&L p05 / median / p95</span>
+                  <span className="text-gray-300">{fmt(getNum(backtest.monte_carlo.pnl_p05))} / {fmt(getNum(backtest.monte_carlo.median_pnl))} / {fmt(getNum(backtest.monte_carlo.pnl_p95))}</span>
+                </div>
+              </div>
+            )}
+
+            {backtest.statistical_significance && Object.keys(backtest.statistical_significance).length > 0 && (
+              <div className={sectionCls}>
+                <div className="text-[9px] uppercase text-gray-500 font-bold py-1">Statistical Significance</div>
+                <HelpBox title="Trust level">
+                  Small samples can look strong by luck. Use p-value and required-trade count as a warning before treating results as reliable.
+                </HelpBox>
+                <div className={rowCls}>
+                  <span className="text-gray-400">t-stat / p-value</span>
+                  <span className="text-gray-300">{fmt(getNum(backtest.statistical_significance.t_statistic))} / {fmt(getNum(backtest.statistical_significance.p_value))}</span>
+                </div>
+                <div className={rowCls}>
+                  <span className="text-gray-400">More trades needed</span>
+                  <span className="text-amber-300">{fmt(getNum(backtest.statistical_significance.additional_trades_needed))}</span>
+                </div>
+              </div>
+            )}
+
+            <HelpBox title="Trade rows">
+              These are the actual strategy trades. Each row shows the date, signal, selected strike, exit reason, regime, and final net P&L.
+            </HelpBox>
 
             <div className="max-h-44 overflow-y-auto border border-gray-800 rounded-lg">
               {backtest.trades.slice(0, 12).map((t) => (

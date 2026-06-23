@@ -5,7 +5,7 @@ import json
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.data import storage
 from api.models import SavedStrategyResponse, PayoffLegSpec
@@ -54,6 +54,10 @@ class StrategyTemplate(BaseModel):
     exit_time: str
     overall_sl_pct: Optional[float] = None
     overall_target_pct: Optional[float] = None
+    strategy_type: str = "CUSTOM"
+    dynamic_legs: bool = False
+    oi_interval: int = 5
+    oi_config: Dict[str, Any] = Field(default_factory=dict)
 
 class ValidationIssue(BaseModel):
     field: str
@@ -66,6 +70,30 @@ class ValidationResponse(BaseModel):
 
 # Predefined templates
 TEMPLATES = [
+    StrategyTemplate(
+        template_id="oi",
+        name="OI",
+        description="Open-interest wall breakout/breakdown strategy. Dynamically buys ATM CE or PE when OI factors pass; indicators can be added as optional confirmation filters.",
+        risk_level="MEDIUM",
+        suitable_regime=["TRENDING", "BREAKOUT", "OI_CONFIRMATION"],
+        legs=[],
+        entry_time="09:30",
+        exit_time="15:15",
+        overall_sl_pct=None,
+        overall_target_pct=None,
+        strategy_type="OI",
+        dynamic_legs=True,
+        oi_interval=5,
+        oi_config={
+            "premium_sl_percent": 25,
+            "premium_target_percent": 50,
+            "trailing_sl_percent": 20,
+            "execution_model": "adverse_close",
+            "run_ablation_study": True,
+            "ablation_trailing_sl_values": [20, 30, 40, 0],
+            "qualification_gates": {"max_p_value": 0.05, "min_profit_factor": 1.3, "min_trades": 200},
+        },
+    ),
     StrategyTemplate(
         template_id="short_straddle",
         name="ATM Short Straddle",

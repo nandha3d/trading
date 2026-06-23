@@ -13,15 +13,32 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field, replace
 from datetime import date, datetime, timedelta, time
 import math
+import random
 from typing import Any, Optional
 
 import polars as pl
 
+from src.backtest import signal_engine
 from src.backtest.costs import CostModel
 from src.backtest.indicators import compute_vwap
 from src.backtest.strategy import CONTRACT_SPECS, lot_size_for
 from src.data import storage
 from .resample import resample_options, resample_spot
+
+
+SUPPORTED_FACTORS = [
+    "oi_wall_unwinding",
+    "vwap_confirmation",
+    "volume_confirmation",
+    "pcr_confirmation",
+    "mtf_trend",
+    "theta_suitability",
+]
+DEFAULT_QUALIFICATION_GATES = {
+    "max_p_value": 0.05,
+    "min_profit_factor": 1.3,
+    "min_trades": 200,
+}
 
 
 @dataclass(frozen=True)
@@ -72,6 +89,11 @@ class OiStrategyConfig:
     expiry_day_premium_sl_percent: float = 20.0
     expiry_day_premium_target_percent: float = 35.0
     require_factor_coverage_percent: float = 80.0
+    active_factors: list[str] = field(default_factory=lambda: list(SUPPORTED_FACTORS))
+    required_factors: list[str] = field(default_factory=list)
+    run_ablation_study: bool = False
+    ablation_trailing_sl_values: list[float] = field(default_factory=lambda: [20.0, 30.0, 40.0, 0.0])
+    qualification_gates: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_QUALIFICATION_GATES))
 
 
 @dataclass(frozen=True)
@@ -106,11 +128,52 @@ def _cfg(overrides: dict[str, Any] | None = None) -> OiStrategyConfig:
         return cfg
     allowed = set(asdict(cfg))
     clean = {k: v for k, v in overrides.items() if k in allowed and v is not None}
+    if "active_factors" in clean:
+        clean["active_factors"] = _clean_factor_list(clean["active_factors"], default=list(SUPPORTED_FACTORS))
+    if "required_factors" in clean:
+        clean["required_factors"] = _clean_factor_list(clean["required_factors"], default=[])
+    if "qualification_gates" in clean:
+        gates = dict(DEFAULT_QUALIFICATION_GATES)
+        raw_gates = clean["qualification_gates"] or {}
+        gates.update({k: float(v) for k, v in raw_gates.items() if k in gates and v is not None})
+        clean["qualification_gates"] = gates
+    if "ablation_trailing_sl_values" in clean:
+        clean["ablation_trailing_sl_values"] = [float(v) for v in clean["ablation_trailing_sl_values"]]
     return replace(cfg, **clean)
 
 
 def _weight(cfg: OiStrategyConfig, factor: str) -> int:
     return int(cfg.score_weights.get(factor, OiStrategyConfig().score_weights[factor]))
+
+
+def _clean_factor_list(value: Any, default: list[str]) -> list[str]:
+    if not value:
+        return list(default)
+    return [str(f) for f in value if str(f) in SUPPORTED_FACTORS]
+
+
+def _active_factor_set(cfg: OiStrategyConfig) -> set[str]:
+    return set(_clean_factor_list(cfg.active_factors, list(SUPPORTED_FACTORS)))
+
+
+def _normalized_score(factors: list[dict[str, Any]]) -> int:
+    max_points = sum(int(f.get("max_points") or 0) for f in factors if f.get("available", True))
+    points = sum(int(f.get("points") or 0) for f in factors if f.get("available", True))
+    return int(round(points / max_points * 100.0)) if max_points else 0
+
+
+def _required_factor_failures(factors: list[dict[str, Any]], cfg: OiStrategyConfig) -> list[str]:
+    by_name = {str(f.get("factor")): f for f in factors}
+    failures: list[str] = []
+    for factor in _clean_factor_list(cfg.required_factors, []):
+        if factor not in _active_factor_set(cfg):
+            continue
+        item = by_name.get(factor)
+        if item is None or not item.get("available", True):
+            failures.append(f"Required factor {factor} is unavailable")
+        elif not item.get("passed"):
+            failures.append(f"Required factor {factor} did not pass")
+    return failures
 
 
 def _factor(
@@ -154,6 +217,11 @@ def _parse_hm(value: str) -> time:
 
 def _session(day: date) -> tuple[datetime, datetime]:
     return datetime(day.year, day.month, day.day, 9, 15), datetime(day.year, day.month, day.day, 15, 30)
+
+
+def _first_eligible_entry_time(cfg: OiStrategyConfig) -> time:
+    dt = datetime(2000, 1, 1, 9, 15) + timedelta(minutes=max(0, int(cfg.no_trade_first_minutes)))
+    return dt.time()
 
 
 def _nearest_expiry(underlying: str, day: date) -> date | None:
@@ -391,8 +459,11 @@ def _score_breakout(
 ) -> tuple[int, list[dict], list[str]]:
     breakdown: list[dict] = []
     reasons: list[str] = []
+    active_factors = _active_factor_set(cfg)
 
     def add(item: dict[str, Any]) -> None:
+        if str(item.get("factor")) not in active_factors:
+            return
         breakdown.append(item)
         if item["passed"] and item.get("available", True):
             reasons.append(item["detail"])
@@ -449,7 +520,7 @@ def _score_breakout(
         add(_factor("theta_suitability", "Theta/time suitability", theta_weight, theta_pass, f"DTE {dte}; fresh-entry cutoff {theta_cutoff.strftime('%H:%M')}", dte, f"<= {theta_cutoff.strftime('%H:%M')}"))
         add_legacy_reason(f"ATM PE premium changed {premium_pct:.1f}%" if premium_pct is not None else "", premium_pct is not None and premium_pct >= 5.0)
 
-    return sum(item["points"] for item in breakdown), breakdown, reasons
+    return _normalized_score(breakdown), breakdown, reasons
 
 
 def _liquidity_reasons(option_row: dict | None, cfg: OiStrategyConfig) -> list[str]:
@@ -578,6 +649,7 @@ def _analyze_prepared_frames(
     coverage = _factor_coverage(score_breakdown)
     if coverage["coverage_percent"] < cfg.require_factor_coverage_percent:
         no_trade_reasons.append(f"Factor coverage {coverage['coverage_percent']:.0f}% is below minimum {cfg.require_factor_coverage_percent:.0f}%")
+    no_trade_reasons.extend(_required_factor_failures(score_breakdown, cfg))
 
     option_row = _row_at(snap, atm, "CE" if direction == "bullish" else "PE")
     no_trade_reasons.extend(_liquidity_reasons(option_row, cfg))
@@ -621,7 +693,7 @@ def _analyze_prepared_frames(
 
 def _time_filter(t: time, cfg: OiStrategyConfig) -> list[str]:
     reasons: list[str] = []
-    start_block = time(9, 15 + cfg.no_trade_first_minutes)
+    start_block = _first_eligible_entry_time(cfg)
     if t < start_block:
         reasons.append(f"No fresh OI trade before {start_block.strftime('%H:%M')}")
     if t > _parse_hm(cfg.no_fresh_trade_after):
@@ -742,11 +814,40 @@ def _option_marks(opts: pl.DataFrame, strike: int, option_type: str, start_ts: d
     return list(rows)
 
 
+def _has_conditions(group: Any) -> bool:
+    return bool(group and getattr(group, "conditions", None))
+
+
+def _signal_bar_index_at(ctx: Any, ts: datetime) -> int | None:
+    if ctx is None or not getattr(ctx, "bars", None):
+        return None
+    idx: int | None = None
+    for i, bar in enumerate(ctx.bars):
+        if bar["ts"] <= ts:
+            idx = i
+        else:
+            break
+    return idx
+
+
+def _signal_group_passes(group: Any, ctx: Any, ts: datetime) -> tuple[bool, str]:
+    if not _has_conditions(group):
+        return True, ""
+    idx = _signal_bar_index_at(ctx, ts)
+    if idx is None:
+        return False, "indicator_signal_data_unavailable"
+    if not signal_engine.eval_group(group, ctx, idx):
+        return False, "indicator_entry_signal_not_met"
+    return True, ""
+
+
 def _exit_from_marks(
     marks: list[dict],
     entry_price: float,
     cfg: OiStrategyConfig,
     expiry: date | None = None,
+    exit_signal: Any = None,
+    signal_ctx: Any = None,
 ) -> tuple[dict | None, str]:
     if not marks:
         return None, "NO_OPTION_MARKS"
@@ -772,6 +873,10 @@ def _exit_from_marks(
             return mark, "TARGET"
         if trail_stop is not None and peak > entry_price and price <= trail_stop:
             return mark, "TRAILING_SL"
+        if _has_conditions(exit_signal):
+            idx = _signal_bar_index_at(signal_ctx, mark["ts"])
+            if idx is not None and signal_engine.eval_group(exit_signal, signal_ctx, idx):
+                return mark, "SIGNAL"
     return marks[-1], "TIME"
 
 
@@ -852,12 +957,290 @@ def _stats_from_trades(trades: list[dict]) -> dict:
         "avg_win": round(sum(wins) / len(wins), 2) if wins else 0.0,
         "avg_loss": round(sum(losses) / len(losses), 2) if losses else 0.0,
         "max_drawdown": round(max_dd, 2),
+        "recovery_factor": round(sum(nets) / abs(max_dd), 4) if max_dd else (999.0 if sum(nets) > 0 else 0.0),
+        "return_to_mdd_ratio": round(sum(nets) / abs(max_dd), 4) if max_dd else (999.0 if sum(nets) > 0 else 0.0),
         "expectancy": round(avg, 2),
         "sharpe": round(sharpe, 4),
         "sortino": round(sortino, 4),
         "win_rate_ci_low": round(max(0.0, (win_rate - ci) * 100), 2),
         "win_rate_ci_high": round(min(100.0, (win_rate + ci) * 100), 2),
         "equity_curve": equity,
+    }
+
+
+def _trade_key(trade: dict) -> str:
+    return "|".join([
+        str(trade.get("day") or ""),
+        str(trade.get("entry_time") or "")[:16],
+        str(trade.get("strike") or ""),
+        str(trade.get("opt_type") or ""),
+    ])
+
+
+def _holding_minutes(trade: dict) -> float:
+    try:
+        entry = datetime.fromisoformat(str(trade["entry_time"]))
+        exit_ts = datetime.fromisoformat(str(trade["exit_time"]))
+        return max(0.0, (exit_ts - entry).total_seconds() / 60.0)
+    except Exception:
+        return 0.0
+
+
+def _drawdown_analysis(trades: list[dict]) -> dict[str, Any]:
+    nets = [float(t["net_pnl"]) for t in trades]
+    equity = 0.0
+    peak = 0.0
+    max_dd = 0.0
+    current_duration = 0
+    max_duration = 0
+    drawdowns: list[float] = []
+    underwater: list[dict[str, Any]] = []
+    for idx, net in enumerate(nets, start=1):
+        equity += net
+        peak = max(peak, equity)
+        dd = equity - peak
+        drawdowns.append(dd)
+        if dd < 0:
+            current_duration += 1
+        else:
+            current_duration = 0
+        max_duration = max(max_duration, current_duration)
+        max_dd = min(max_dd, dd)
+        trade = trades[idx - 1]
+        underwater.append({
+            "trade": idx,
+            "day": trade.get("day"),
+            "equity": round(equity, 2),
+            "drawdown": round(dd, 2),
+        })
+    avg_drawdown = sum(drawdowns) / len(drawdowns) if drawdowns else 0.0
+    net_pnl = sum(nets)
+    recovery = net_pnl / abs(max_dd) if max_dd else (999.0 if net_pnl > 0 else 0.0)
+    return {
+        "max_drawdown": round(max_dd, 2),
+        "max_drawdown_duration_trades": max_duration,
+        "average_drawdown": round(avg_drawdown, 2),
+        "recovery_factor": round(recovery, 4),
+        "return_to_mdd_ratio": round(recovery, 4),
+        "calmar_proxy": round(recovery, 4),
+        "underwater_curve": underwater,
+    }
+
+
+def _baseline_per_trade(strategy_trades: list[dict], baseline_trades: list[dict]) -> list[dict[str, Any]]:
+    baseline_by_key = {_trade_key(t): t for t in baseline_trades}
+    strategy_keys = {_trade_key(t) for t in strategy_trades}
+    rows: list[dict[str, Any]] = []
+    for trade in strategy_trades:
+        key = _trade_key(trade)
+        base = baseline_by_key.get(key)
+        rows.append({
+            "key": key,
+            "day": trade.get("day"),
+            "entry_time": trade.get("entry_time"),
+            "strike": trade.get("strike"),
+            "opt_type": trade.get("opt_type"),
+            "strategy_net_pnl": round(float(trade.get("net_pnl") or 0.0), 2),
+            "baseline_net_pnl": round(float(base.get("net_pnl") or 0.0), 2) if base else None,
+            "delta": round(float(trade.get("net_pnl") or 0.0) - float(base.get("net_pnl") or 0.0), 2) if base else None,
+            "matched": base is not None,
+            "filter_decision": "taken",
+        })
+    for base in baseline_trades:
+        key = _trade_key(base)
+        if key in strategy_keys:
+            continue
+        rows.append({
+            "key": key,
+            "day": base.get("day"),
+            "entry_time": base.get("entry_time"),
+            "strike": base.get("strike"),
+            "opt_type": base.get("opt_type"),
+            "strategy_net_pnl": None,
+            "baseline_net_pnl": round(float(base.get("net_pnl") or 0.0), 2),
+            "delta": None,
+            "matched": False,
+            "filter_decision": "skipped_by_filter",
+        })
+    return rows
+
+
+def _trade_quality(trades: list[dict], trade_journal: list[dict], baseline_per_trade: list[dict]) -> dict[str, Any]:
+    exit_counts: dict[str, int] = {}
+    for trade in trades:
+        exit_counts[str(trade.get("exit_reason") or "UNKNOWN")] = exit_counts.get(str(trade.get("exit_reason") or "UNKNOWN"), 0) + 1
+    winners = [t for t in trades if float(t.get("net_pnl") or 0.0) > 0]
+    losers = [t for t in trades if float(t.get("net_pnl") or 0.0) <= 0]
+    avg_win_hold = sum(_holding_minutes(t) for t in winners) / len(winners) if winners else 0.0
+    avg_loss_hold = sum(_holding_minutes(t) for t in losers) / len(losers) if losers else 0.0
+    avg_win = sum(float(t.get("net_pnl") or 0.0) for t in winners) / len(winners) if winners else 0.0
+    avg_loss = abs(sum(float(t.get("net_pnl") or 0.0) for t in losers) / len(losers)) if losers else 0.0
+    skipped_reasons: dict[str, int] = {}
+    for row in trade_journal:
+        if row.get("action") != "NO_TRADE":
+            continue
+        for reason in row.get("no_trade_reasons", []):
+            skipped_reasons[str(reason)] = skipped_reasons.get(str(reason), 0) + 1
+    skipped_baseline = [r for r in baseline_per_trade if r["filter_decision"] == "skipped_by_filter"]
+    skipped_net = sum(float(r.get("baseline_net_pnl") or 0.0) for r in skipped_baseline)
+    skipped_profitable = sum(1 for r in skipped_baseline if float(r.get("baseline_net_pnl") or 0.0) > 0)
+    return {
+        "exit_reason_distribution": exit_counts,
+        "avg_holding_minutes": round(sum(_holding_minutes(t) for t in trades) / len(trades), 2) if trades else 0.0,
+        "avg_winner_holding_minutes": round(avg_win_hold, 2),
+        "avg_loser_holding_minutes": round(avg_loss_hold, 2),
+        "payoff_ratio": round(avg_win / avg_loss, 4) if avg_loss else (999.0 if avg_win else 0.0),
+        "profit_factor": _stats_from_trades(trades)["profit_factor"],
+        "avg_mae": round(sum(float(t.get("mae") or 0.0) for t in trades) / len(trades), 2) if trades else 0.0,
+        "avg_mfe": round(sum(float(t.get("mfe") or 0.0) for t in trades) / len(trades), 2) if trades else 0.0,
+        "skipped_reason_counts": skipped_reasons,
+        "skipped_baseline": {
+            "candidates": len(skipped_baseline),
+            "profitable": skipped_profitable,
+            "win_rate": round(skipped_profitable / len(skipped_baseline) * 100, 2) if skipped_baseline else 0.0,
+            "net_pnl": round(skipped_net, 2),
+        },
+    }
+
+
+def _bucket_entry_time(value: str) -> str:
+    try:
+        ts = datetime.fromisoformat(value)
+        bucket_min = (ts.minute // 30) * 30
+        return f"{ts.hour:02d}:{bucket_min:02d}"
+    except Exception:
+        return "unknown"
+
+
+def _duration_bucket(minutes: float) -> str:
+    if minutes <= 15:
+        return "0-15m"
+    if minutes <= 30:
+        return "15-30m"
+    if minutes <= 60:
+        return "30-60m"
+    if minutes <= 120:
+        return "60-120m"
+    return "120m+"
+
+
+def _timing_analysis(trades: list[dict]) -> dict[str, Any]:
+    enriched = []
+    for trade in trades:
+        try:
+            day_value = date.fromisoformat(str(trade["day"]))
+            weekday = day_value.strftime("%A")
+        except Exception:
+            weekday = "unknown"
+        expiry_bucket = "expiry_day" if trade.get("day") == trade.get("expiry") else "non_expiry_day"
+        hold = _holding_minutes(trade)
+        enriched.append({
+            **trade,
+            "weekday": weekday,
+            "expiry_bucket": expiry_bucket,
+            "entry_time_bucket": _bucket_entry_time(str(trade.get("entry_time") or "")),
+            "holding_duration_bucket": _duration_bucket(hold),
+        })
+    return {
+        "weekday": _summarize_by_key(enriched, "weekday"),
+        "expiry": _summarize_by_key(enriched, "expiry_bucket"),
+        "entry_time": _summarize_by_key(enriched, "entry_time_bucket"),
+        "holding_duration": _summarize_by_key(enriched, "holding_duration_bucket"),
+        "iv_regime": {"status": "unavailable_not_applied", "reason": "Historical IV rank/skew is not available in the current DB."},
+    }
+
+
+def _equity_drawdown_for_sequence(nets: list[float]) -> tuple[float, float]:
+    equity = 0.0
+    peak = 0.0
+    mdd = 0.0
+    for net in nets:
+        equity += net
+        peak = max(peak, equity)
+        mdd = min(mdd, equity - peak)
+    return equity, mdd
+
+
+def _percentile(sorted_values: list[float], pct: float) -> float:
+    if not sorted_values:
+        return 0.0
+    idx = min(len(sorted_values) - 1, max(0, int(round((len(sorted_values) - 1) * pct))))
+    return sorted_values[idx]
+
+
+def _monte_carlo(trades: list[dict], runs: int = 2000) -> dict[str, Any]:
+    nets = [float(t.get("net_pnl") or 0.0) for t in trades]
+    if not nets:
+        return {"runs": runs, "mdd_95": 0.0, "mdd_99": 0.0, "median_pnl": 0.0, "pnl_p05": 0.0, "pnl_p95": 0.0}
+    rng = random.Random(42)
+    pnls: list[float] = []
+    drawdowns: list[float] = []
+    for _ in range(runs):
+        sample = [rng.choice(nets) for _ in nets]
+        pnl, mdd = _equity_drawdown_for_sequence(sample)
+        pnls.append(pnl)
+        drawdowns.append(mdd)
+    pnls.sort()
+    drawdowns.sort()
+    historical_pnl, historical_mdd = _equity_drawdown_for_sequence(nets)
+    return {
+        "runs": runs,
+        "historical_pnl": round(historical_pnl, 2),
+        "historical_mdd": round(historical_mdd, 2),
+        "mdd_95": round(_percentile(drawdowns, 0.05), 2),
+        "mdd_99": round(_percentile(drawdowns, 0.01), 2),
+        "median_pnl": round(_percentile(pnls, 0.5), 2),
+        "pnl_p05": round(_percentile(pnls, 0.05), 2),
+        "pnl_p95": round(_percentile(pnls, 0.95), 2),
+        "note": "Bootstrap resamples trade returns to show sequence and small-sample risk.",
+    }
+
+
+def _statistical_significance(trades: list[dict]) -> dict[str, Any]:
+    nets = [float(t.get("net_pnl") or 0.0) for t in trades]
+    n = len(nets)
+    minimum = int(DEFAULT_QUALIFICATION_GATES["min_trades"])
+    if n < 2:
+        return {
+            "trades": n,
+            "t_statistic": 0.0,
+            "p_value": 1.0,
+            "mean_return": round(nets[0], 2) if nets else 0.0,
+            "minimum_recommended_trades": minimum,
+            "additional_trades_needed": max(0, minimum - n),
+            "is_statistically_meaningful": False,
+        }
+    mean = sum(nets) / n
+    variance = sum((x - mean) ** 2 for x in nets) / (n - 1)
+    sd = math.sqrt(variance)
+    t_stat = mean / (sd / math.sqrt(n)) if sd > 0 else 0.0
+    p_value = math.erfc(abs(t_stat) / math.sqrt(2.0))
+    return {
+        "trades": n,
+        "t_statistic": round(t_stat, 4),
+        "p_value": round(p_value, 4),
+        "mean_return": round(mean, 2),
+        "minimum_recommended_trades": minimum,
+        "additional_trades_needed": max(0, minimum - n),
+        "is_statistically_meaningful": bool(n >= minimum and p_value < 0.05),
+        "note": "Uses a normal approximation for the mean-return test; small samples should be treated as directional only.",
+    }
+
+
+def _sample_size_warning(stats: dict[str, Any]) -> dict[str, Any]:
+    trades = int(stats.get("trades") or 0)
+    minimum = int(DEFAULT_QUALIFICATION_GATES["min_trades"])
+    if trades >= minimum:
+        return {"level": "ok", "message": f"Sample size is at or above the {minimum}-trade research threshold.", "trades": trades}
+    low = stats.get("win_rate_ci_low", 0.0)
+    high = stats.get("win_rate_ci_high", 0.0)
+    needed = minimum - trades
+    return {
+        "level": "warning",
+        "trades": trades,
+        "minimum_recommended_trades": minimum,
+        "additional_trades_needed": needed,
+        "message": f"Statistical warning: {trades} trades gives a win-rate confidence interval of [{low:.0f}%, {high:.0f}%] at 95% confidence. Run at least {needed} more trades before drawing strategy conclusions.",
     }
 
 
@@ -892,6 +1275,232 @@ def _cost_sensitivity(trades: list[dict], cfg: OiStrategyConfig) -> list[dict[st
     return out
 
 
+def _trade_identity(trade: dict) -> str:
+    return "|".join([
+        str(trade.get("entry_time") or ""),
+        str(trade.get("strike") or ""),
+        str(trade.get("opt_type") or ""),
+        str(trade.get("signal_type") or ""),
+    ])
+
+
+def _qualification(stats: dict[str, Any], sig: dict[str, Any], gates: dict[str, float]) -> dict[str, Any]:
+    trades = int(stats.get("trades") or 0)
+    profit_factor = float(stats.get("profit_factor") or 0.0)
+    p_value = float(sig.get("p_value") or 1.0)
+    checks = {
+        "p_value": p_value < float(gates["max_p_value"]),
+        "profit_factor": profit_factor > float(gates["min_profit_factor"]),
+        "trade_count": trades >= int(gates["min_trades"]),
+    }
+    return {
+        "research_qualified": all(checks.values()),
+        "checks": checks,
+        "gates": {
+            "max_p_value": float(gates["max_p_value"]),
+            "min_profit_factor": float(gates["min_profit_factor"]),
+            "min_trades": int(gates["min_trades"]),
+        },
+        "warning": "" if trades >= int(gates["min_trades"]) else f"{trades} trades is below the {int(gates['min_trades'])}-trade research threshold.",
+    }
+
+
+def _ablation_row(name: str, kind: str, active: list[str], result: dict[str, Any], gates: dict[str, float]) -> dict[str, Any]:
+    stats = result.get("stats", {})
+    sig = result.get("statistical_significance", {})
+    mc = result.get("monte_carlo", {})
+    quality = _qualification(stats, sig, gates)
+    return {
+        "config_id": name,
+        "label": name.replace("_", " ").title(),
+        "kind": kind,
+        "active_factors": active,
+        "trades": int(stats.get("trades") or 0),
+        "net_pnl": float(stats.get("net_pnl") or 0.0),
+        "win_rate": float(stats.get("win_rate") or 0.0),
+        "profit_factor": float(stats.get("profit_factor") or 0.0),
+        "sharpe": float(stats.get("sharpe") or 0.0),
+        "sortino": float(stats.get("sortino") or 0.0),
+        "t_statistic": float(sig.get("t_statistic") or 0.0),
+        "p_value": float(sig.get("p_value") or 1.0),
+        "max_drawdown": float(stats.get("max_drawdown") or 0.0),
+        "recovery_factor": float(stats.get("recovery_factor") or 0.0),
+        "monte_carlo_mdd_95": float(mc.get("mdd_95") or 0.0),
+        "monte_carlo_mdd_99": float(mc.get("mdd_99") or 0.0),
+        "research_qualified": quality["research_qualified"],
+        "qualification": quality,
+    }
+
+
+def _rank_ablation_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(
+        rows,
+        key=lambda r: (
+            not bool(r["research_qualified"]),
+            float(r["p_value"]),
+            -float(r["profit_factor"]),
+            abs(float(r["max_drawdown"])),
+            -float(r["net_pnl"]),
+        ),
+    )
+
+
+def _paired_comparison(left: dict[str, Any], right: dict[str, Any], left_label: str, right_label: str) -> dict[str, Any]:
+    left_by_key = {_trade_identity(t): t for t in left.get("trades", [])}
+    right_by_key = {_trade_identity(t): t for t in right.get("trades", [])}
+    overlap = sorted(set(left_by_key) & set(right_by_key))
+    rows = []
+    for key in overlap:
+        l_net = float(left_by_key[key].get("net_pnl") or 0.0)
+        r_net = float(right_by_key[key].get("net_pnl") or 0.0)
+        rows.append({
+            "key": key,
+            "left_net_pnl": round(l_net, 2),
+            "right_net_pnl": round(r_net, 2),
+            "delta": round(l_net - r_net, 2),
+        })
+    return {
+        "left": left_label,
+        "right": right_label,
+        "overlap_trades": len(rows),
+        "left_only_trades": max(0, len(left_by_key) - len(rows)),
+        "right_only_trades": max(0, len(right_by_key) - len(rows)),
+        "overlap_delta_net_pnl": round(sum(float(r["delta"]) for r in rows), 2),
+        "rows": rows[:200],
+    }
+
+
+def _research_verdict(full_row: dict[str, Any] | None, no_oi_row: dict[str, Any] | None, gates: dict[str, float]) -> dict[str, Any]:
+    if not full_row or not no_oi_row:
+        return {"verdict": "insufficient evidence", "detail": "Full-stack or no-OI-wall comparison is unavailable."}
+    delta = float(full_row["net_pnl"]) - float(no_oi_row["net_pnl"])
+    if int(full_row["trades"]) < int(gates["min_trades"]) and int(no_oi_row["trades"]) < int(gates["min_trades"]):
+        return {
+            "verdict": "insufficient evidence",
+            "detail": f"Both key configs are below the {int(gates['min_trades'])}-trade threshold; do not allocate capital from this sample.",
+            "full_minus_no_oi_net_pnl": round(delta, 2),
+        }
+    if delta > 0 and float(full_row["p_value"]) < float(gates["max_p_value"]):
+        return {
+            "verdict": "OI wall improves",
+            "detail": "Adding OI wall improves net P&L and the full-stack mean return passes the p-value gate.",
+            "full_minus_no_oi_net_pnl": round(delta, 2),
+        }
+    if delta < 0:
+        return {
+            "verdict": "OI wall hurts",
+            "detail": "The full stack underperforms the same stack without OI wall; treat OI wall as a harmful or overly restrictive filter until proven otherwise.",
+            "full_minus_no_oi_net_pnl": round(delta, 2),
+        }
+    return {
+        "verdict": "insufficient evidence",
+        "detail": "OI wall did not produce a statistically decisive improvement over the no-OI-wall stack.",
+        "full_minus_no_oi_net_pnl": round(delta, 2),
+    }
+
+
+def _run_oi_ablation_study(
+    underlying: str,
+    start: date,
+    end: date,
+    expiry_offset: int,
+    interval: int,
+    cfg: OiStrategyConfig,
+    mode: str,
+    signal_indicators: list[Any] | None,
+    entry_signal: Any,
+    exit_signal: Any,
+) -> dict[str, Any]:
+    gates = dict(DEFAULT_QUALIFICATION_GATES)
+    gates.update(cfg.qualification_gates or {})
+    base_config = asdict(cfg)
+    base_config["run_ablation_study"] = False
+    all_factors = list(SUPPORTED_FACTORS)
+    configs: list[tuple[str, str, list[str]]] = []
+    for factor in all_factors:
+        configs.append((f"standalone_{factor}", "standalone", [factor]))
+    configs.append(("full_stack", "leave_one_out", all_factors))
+    for factor in all_factors:
+        configs.append((f"all_minus_{factor}", "leave_one_out", [f for f in all_factors if f != factor]))
+    configs.append(("marginal_add_oi_to_non_oi_stack", "marginal", all_factors))
+
+    raw_results: dict[str, dict[str, Any]] = {}
+    rows: list[dict[str, Any]] = []
+    for config_id, kind, active in configs:
+        study_config = {
+            **base_config,
+            "active_factors": active,
+            "required_factors": active,
+            "run_ablation_study": False,
+        }
+        result = backtest_oi_strategy(
+            underlying,
+            start,
+            end,
+            expiry_offset=expiry_offset,
+            interval=interval,
+            config=study_config,
+            mode=mode,
+            signal_indicators=signal_indicators,
+            entry_signal=entry_signal,
+            exit_signal=exit_signal,
+        )
+        raw_results[config_id] = result
+        rows.append(_ablation_row(config_id, kind, active, result, gates))
+
+    full = next((r for r in rows if r["config_id"] == "full_stack"), None)
+    no_oi = next((r for r in rows if r["config_id"] == "all_minus_oi_wall_unwinding"), None)
+    trailing_rows: list[dict[str, Any]] = []
+    for value in cfg.ablation_trailing_sl_values:
+        trailing_config = {
+            **base_config,
+            "active_factors": all_factors,
+            "required_factors": _clean_factor_list(cfg.required_factors, []),
+            "trailing_sl_percent": float(value),
+            "run_ablation_study": False,
+        }
+        result = backtest_oi_strategy(
+            underlying,
+            start,
+            end,
+            expiry_offset=expiry_offset,
+            interval=interval,
+            config=trailing_config,
+            mode=mode,
+            signal_indicators=signal_indicators,
+            entry_signal=entry_signal,
+            exit_signal=exit_signal,
+        )
+        row = _ablation_row(f"trailing_sl_{value:g}", "trailing_sl", all_factors, result, gates)
+        row["trailing_sl_percent"] = float(value)
+        trailing_rows.append(row)
+
+    return {
+        "gates": {
+            "max_p_value": float(gates["max_p_value"]),
+            "min_profit_factor": float(gates["min_profit_factor"]),
+            "min_trades": int(gates["min_trades"]),
+        },
+        "rows": _rank_ablation_rows(rows),
+        "factor_rows": _rank_ablation_rows(rows),
+        "trailing_sl_study": _rank_ablation_rows(trailing_rows),
+        "oi_marginal_contribution": {
+            "full_stack_net_pnl": full["net_pnl"] if full else None,
+            "no_oi_wall_net_pnl": no_oi["net_pnl"] if no_oi else None,
+            "delta_net_pnl": round(float(full["net_pnl"]) - float(no_oi["net_pnl"]), 2) if full and no_oi else None,
+            "full_stack_trades": full["trades"] if full else None,
+            "no_oi_wall_trades": no_oi["trades"] if no_oi else None,
+        },
+        "paired_comparison": _paired_comparison(
+            raw_results.get("full_stack", {}),
+            raw_results.get("all_minus_oi_wall_unwinding", {}),
+            "full_stack",
+            "all_minus_oi_wall_unwinding",
+        ),
+        "research_verdict": _research_verdict(full, no_oi, gates),
+    }
+
+
 def backtest_oi_strategy(
     underlying: str,
     start: date,
@@ -900,6 +1509,9 @@ def backtest_oi_strategy(
     interval: int = 5,
     config: dict[str, Any] | None = None,
     mode: str = "historical",
+    signal_indicators: list[Any] | None = None,
+    entry_signal: Any = None,
+    exit_signal: Any = None,
 ) -> dict:
     """Scan every N-minute candle, enter valid OI signals, and manage exits.
 
@@ -934,6 +1546,15 @@ def backtest_oi_strategy(
         spot = resample_spot(spot_raw, interval).sort("ts")
         opts = resample_options(options_raw, interval).sort("ts")
         times = spot.select("ts").unique().sort("ts")["ts"].to_list()
+        has_entry_signal = bool(signal_indicators and _has_conditions(entry_signal))
+        has_exit_signal = bool(signal_indicators and _has_conditions(exit_signal))
+        signal_ctx = None
+        if has_entry_signal or has_exit_signal:
+            signal_ctx = signal_engine.build_context(
+                signal_indicators or [],
+                spot_raw,
+                dte=max((exp - day).days, 0),
+            )
         day_trades: list[dict] = []
         day_net = 0.0
         blocked_until: datetime | None = None
@@ -942,7 +1563,7 @@ def backtest_oi_strategy(
         daily_loss_limit = -abs(cfg.initial_capital * cfg.daily_loss_limit_percent / 100.0)
 
         for ts in times:
-            if ts.time() < time(9, 15 + cfg.no_trade_first_minutes):
+            if ts.time() < _first_eligible_entry_time(cfg):
                 continue
             expiry_day = ts.date() == exp
             no_fresh_after = cfg.expiry_day_no_fresh_trade_after if expiry_day and cfg.expiry_day_tightening else cfg.no_fresh_trade_after
@@ -1037,15 +1658,38 @@ def backtest_oi_strategy(
 
             opt_type = sig["suggested_legs"][0]["opt_type"]
             strike = int(sig["atm_strike"])
+            signal_ts = datetime.fromisoformat(sig["timestamp"])
+            if has_entry_signal:
+                indicator_ok, indicator_reason = _signal_group_passes(entry_signal, signal_ctx, signal_ts)
+                if not indicator_ok:
+                    no_trade_count += 1
+                    trade_journal.append({
+                        "day": day.isoformat(),
+                        "timestamp": signal_ts.isoformat(),
+                        "action": "NO_TRADE",
+                        "candidate_signal_type": sig.get("candidate_signal_type", sig.get("signal_type", "NO_TRADE")),
+                        "score": sig.get("score", 0),
+                        "factor_scores": sig.get("factor_scores", []),
+                        "no_trade_reasons": [indicator_reason],
+                        "regime": sig.get("regime"),
+                    })
+                    continue
             force_exit_time = cfg.expiry_day_force_exit_time if expiry_day and cfg.expiry_day_tightening else cfg.force_exit_time
             force_exit_dt = datetime.combine(day, _parse_hm(force_exit_time))
-            marks = _option_marks(opts, strike, opt_type, datetime.fromisoformat(sig["timestamp"]), force_exit_dt)
+            marks = _option_marks(opts, strike, opt_type, signal_ts, force_exit_dt)
             if not marks:
                 no_trade_count += 1
                 continue
             entry = marks[0]
             raw_entry_price = float(entry["close"])
-            exit_mark, exit_reason = _exit_from_marks(marks, raw_entry_price, cfg, exp)
+            exit_mark, exit_reason = _exit_from_marks(
+                marks,
+                raw_entry_price,
+                cfg,
+                exp,
+                exit_signal=exit_signal if has_exit_signal else None,
+                signal_ctx=signal_ctx,
+            )
             if exit_mark is None:
                 no_trade_count += 1
                 continue
@@ -1130,9 +1774,12 @@ def backtest_oi_strategy(
 
     stats = _stats_from_trades(trades)
     baseline_stats = _stats_from_trades(baseline_trades)
+    baseline_per_trade = _baseline_per_trade(trades, baseline_trades)
     baseline_comparison = {
         "name": "Naive same-entry ATM long premium baseline",
         "stats": {k: v for k, v in baseline_stats.items() if k != "equity_curve"},
+        "equity_curve": baseline_stats["equity_curve"],
+        "per_trade": baseline_per_trade,
         "net_pnl_delta": round(stats["net_pnl"] - baseline_stats["net_pnl"], 2),
         "note": "Baseline buys the ATM CE/PE at candidate signal times while ignoring the factor score gate, using close-price fills.",
     }
@@ -1162,6 +1809,20 @@ def backtest_oi_strategy(
                 "end": window_days[-1] if window_days else None,
                 "stats": {k: v for k, v in window_stats.items() if k != "equity_curve"},
             })
+    ablation = {}
+    if cfg.run_ablation_study:
+        ablation = _run_oi_ablation_study(
+            underlying,
+            start,
+            end,
+            expiry_offset,
+            interval,
+            cfg,
+            mode,
+            signal_indicators,
+            entry_signal,
+            exit_signal,
+        )
     return {
         "underlying": underlying,
         "start": start.isoformat(),
@@ -1177,9 +1838,21 @@ def backtest_oi_strategy(
         "trade_journal": trade_journal,
         "baseline_comparison": baseline_comparison,
         "cost_sensitivity": _cost_sensitivity(trades, cfg),
+        "drawdown_analysis": _drawdown_analysis(trades),
+        "trade_quality": _trade_quality(trades, trade_journal, baseline_per_trade),
+        "timing_analysis": _timing_analysis(trades),
+        "monte_carlo": _monte_carlo(trades),
+        "statistical_significance": _statistical_significance(trades),
+        "sample_size_warning": _sample_size_warning(stats),
         "regime_summary": regime_summary,
         "factor_summary": factor_summary,
         "walk_forward_summary": walk_forward,
+        "ablation_study": ablation.get("rows", []),
+        "trailing_sl_study": ablation.get("trailing_sl_study", []),
+        "oi_marginal_contribution": ablation.get("oi_marginal_contribution", {}),
+        "paired_comparison": ablation.get("paired_comparison", {}),
+        "research_verdict": ablation.get("research_verdict", {}),
+        "ablation_gates": ablation.get("gates", {}),
         "data_quality": data_quality,
         "config": asdict(cfg),
     }

@@ -1,0 +1,78 @@
+INFO:     Will watch for changes in these directories: ['V:\\pers\\Freelance\\trading']
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     Started reloader process [46844] using WatchFiles
+INFO:     Started server process [39412]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:61501 - "WebSocket /api/live/stream" [accepted]
+INFO:     connection open
+[I 260621 11:02:13 smartConnect:124] in pool
+[I 260621 11:02:29 smartConnect:124] in pool
+[W 260621 11:02:40 smartWebSocketV2:318] Attempting to resubscribe/reconnect (Attempt 1)...
+WS error: Connection closed
+[W 260621 11:02:52 smartWebSocketV2:342] Connection closed due to max retry attempts reached.
+WS error: Connection closed
+[W 260621 11:02:52 smartWebSocketV2:342] Connection closed due to max retry attempts reached.
+WS error: Connection closed
+[W 260621 11:02:52 smartWebSocketV2:342] Connection closed due to max retry attempts reached.
+INFO:     connection closed
+INFO:     127.0.0.1:49496 - "WebSocket /api/live/stream" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:65103 - "WebSocket /api/live/stream" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:49302 - "WebSocket /api/live/stream" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:51775 - "WebSocket /api/live/stream" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:59603 - "WebSocket /api/live/stream" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:51052 - "WebSocket /api/live/stream" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:51019 - "WebSocket /api/live/stream" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:58353 - "WebSocket /api/live/stream" [accepted]
+INFO:     127.0.0.1:65320 - "WebSocket /api/live/stream" [accepted]
+INFO:     connection open
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:58748 - "WebSocket /api/live/stream" [accepted]
+INFO:     127.0.0.1:63850 - "WebSocket /api/live/stream" [accepted]
+INFO:     connection open
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+[W 260621 11:44:35 smartWebSocketV2:318] Attempting to resubscribe/reconnect (Attempt 1)...
+WS error: Connection closed
+[W 260621 11:44:46 smartWebSocketV2:342] Connection closed due to max retry attempts reached.
+WS error: Connection closed
+[W 260621 11:44:46 smartWebSocketV2:342] Connection closed due to max retry attempts reached.
+WS error: Connection closed
+[W 260621 11:44:46 smartWebSocketV2:342] Connection closed due to max retry attempts reached.
+INFO:     127.0.0.1:62010 - "WebSocket /api/live/stream" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:62011 - "WebSocket /api/live/stream" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:64507 - "WebSocket /api/live/stream" [accepted]
+INFO:     connection open
+INFO:     127.0.0.1:62984 - "WebSocket /api/live/stream" [accepted]
+INFO:     connection closed
+INFO:     connection open
+INFO:     connection closed
+INFO:     connection closed
+INFO:     127.0.0.1:61631 - "WebSocket /api/live/stream" [accepted]
+INFO:     connection open
+INFO:     connection closed
+INFO:     127.0.0.1:53878 - "WebSocket /api/live/stream" [accepted]
+INFO:     connection open
+INFO:     connection closed
+Cached scrip master unreadable (); refetching.
+Cached scrip master unreadable (); refetching.

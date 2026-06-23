@@ -384,6 +384,14 @@ async def websocket_endpoint(websocket: WebSocket):
             pass
         except Exception as e:
             logger.error("sender_loop error: %s", e)
+            try:
+                await websocket.send_json({
+                    "status": "stream_error",
+                    "error": "live_stream_error",
+                    "message": str(e),
+                })
+            except Exception:
+                pass
             
     try:
         # Start the background sender task

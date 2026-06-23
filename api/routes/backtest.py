@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 
 from api.models import (BacktestRequest, BacktestResponse, GridCellResult, GridRequest,
                         GridResponse, LegResult, StatsResult, TradeResult)
+from src.analysis import oi_strategy
 from src.backtest import engine, grid
 from src.backtest.strategy import Action, Leg, OptType, RiskRule, Selection, StrategySpec, Unit
 from src.data import storage
@@ -86,16 +87,7 @@ def _build_and_run(req: BacktestRequest):
     return engine.run_range(spec, req.start, req.end)
 
 
-@router.post("/backtest", response_model=BacktestResponse)
-async def run_backtest(req: BacktestRequest):
-    run_id = f"bt_{uuid.uuid4().hex[:10]}"
-    try:
-        result = await asyncio.to_thread(_build_and_run, req)
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-    except Exception as e:
-        raise HTTPException(500, f"backtest error: {e}")
-
+def _generic_response(result, run_id: str, strategy_type: str = "CUSTOM") -> BacktestResponse:
     s = result.stats
     skipped = [t for t in result.trades if t.skip_reason]
     executed = [t for t in result.trades if not t.skip_reason]
@@ -130,7 +122,7 @@ async def run_backtest(req: BacktestRequest):
     ]
     equity = list(accumulate([0.0] + [t.net for t in executed]))
 
-    response_data = BacktestResponse(
+    return BacktestResponse(
         stats=StatsResult(
             trades=s.trades,
             win_rate=round(s.win_rate, 4),
@@ -144,8 +136,100 @@ async def run_backtest(req: BacktestRequest):
         trades=trades_out,
         equity_curve=[round(v, 2) for v in equity],
         skipped_days=len(skipped),
-        run_id=run_id
+        run_id=run_id,
+        strategy_type=strategy_type,
     )
+
+
+def _run_oi_backtest(req: BacktestRequest) -> dict:
+    return oi_strategy.backtest_oi_strategy(
+        underlying=req.underlying,
+        start=req.start,
+        end=req.end,
+        expiry_offset=req.expiry_offset,
+        interval=req.oi_interval,
+        config=req.oi_config,
+        mode="historical",
+        signal_indicators=req.indicators,
+        entry_signal=req.entry_signal,
+        exit_signal=req.exit_signal,
+    )
+
+
+def _oi_response(result: dict, run_id: str) -> BacktestResponse:
+    stats = result.get("stats", {})
+    trades = result.get("trades", [])
+    daily = result.get("daily", [])
+    trades_out = [
+        TradeResult(
+            day=str(t.get("day", "")),
+            gross=round(float(t.get("gross_pnl") or 0.0), 2),
+            cost=round(float(t.get("cost") or 0.0), 2),
+            net=round(float(t.get("net_pnl") or 0.0), 2),
+            exit_reason=str(t.get("exit_reason") or ""),
+            entry_spot=round(float(t.get("entry_spot") or 0.0), 2),
+            skip_reason="",
+            vix=0.0,
+            expiry=str(t.get("expiry")) if t.get("expiry") else None,
+            entry_time=str(t.get("entry_time")) if t.get("entry_time") else None,
+            legs=[
+                LegResult(
+                    strike=int(t.get("strike") or 0),
+                    entry=round(float(t.get("entry_price") or 0.0), 2),
+                    exit=round(float(t.get("exit_price") or 0.0), 2),
+                    qty=int(t.get("qty") or 0),
+                    exit_reason=str(t.get("exit_reason") or ""),
+                    action="BUY",
+                    opt_type=str(t.get("opt_type") or ""),
+                    exit_time=str(t.get("exit_time")) if t.get("exit_time") else None,
+                )
+            ],
+        )
+        for t in trades
+    ]
+    oi_analytics = {k: v for k, v in result.items() if k not in {"stats", "equity_curve"}}
+    oi_analytics["oi_trades"] = trades
+    return BacktestResponse(
+        stats=StatsResult(
+            trades=int(stats.get("trades") or 0),
+            win_rate=round(float(stats.get("win_rate") or 0.0) / 100.0, 4),
+            net_pnl=round(float(stats.get("net_pnl") or 0.0), 2),
+            expectancy=round(float(stats.get("expectancy") or stats.get("avg_trade") or 0.0), 2),
+            avg_win=round(float(stats.get("avg_win") or 0.0), 2),
+            avg_loss=round(float(stats.get("avg_loss") or 0.0), 2),
+            max_drawdown=round(float(stats.get("max_drawdown") or 0.0), 2),
+            sharpe=round(float(stats.get("sharpe") or 0.0), 4),
+        ),
+        trades=trades_out,
+        equity_curve=[round(float(v), 2) for v in result.get("equity_curve", [])],
+        skipped_days=sum(1 for d in daily if d.get("skip_reason")),
+        run_id=run_id,
+        strategy_type="OI",
+        oi_analytics=oi_analytics,
+    )
+
+
+@router.post("/backtest", response_model=BacktestResponse)
+async def run_backtest(req: BacktestRequest):
+    run_id = f"bt_{uuid.uuid4().hex[:10]}"
+    try:
+        if req.strategy_type.upper() == "OI":
+            oi_result = await asyncio.to_thread(_run_oi_backtest, req)
+            response_data = _oi_response(oi_result, run_id)
+        else:
+            result = await asyncio.to_thread(_build_and_run, req)
+            response_data = _generic_response(result, run_id, req.strategy_type.upper())
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        msg = str(e)
+        if "market.duckdb" in msg and ("Cannot open file" in msg or "already open" in msg):
+            raise HTTPException(
+                503,
+                "backtest error: market.duckdb is locked by another backend process. "
+                "Stop duplicate run_api/uvicorn servers and start one backend process.",
+            )
+        raise HTTPException(500, f"backtest error: {e}")
 
     try:
         storage.save_backtest_run(
@@ -155,7 +239,7 @@ async def run_backtest(req: BacktestRequest):
             stats_json=response_data.json(),
             status="COMPLETED"
         )
-        storage.log_audit_event("BACKTEST_RUN", "BACKTEST", run_id, {"net_pnl": s.net_pnl})
+        storage.log_audit_event("BACKTEST_RUN", "BACKTEST", run_id, {"net_pnl": response_data.stats.net_pnl})
     except Exception as e:
         print(f"Error saving backtest run: {e}")
 
@@ -204,62 +288,16 @@ async def run_grid(req: GridRequest):
 async def run_and_save_backtest(req: BacktestRequest):
     run_id = f"bt_{uuid.uuid4().hex[:10]}"
     try:
-        result = await asyncio.to_thread(_build_and_run, req)
+        if req.strategy_type.upper() == "OI":
+            oi_result = await asyncio.to_thread(_run_oi_backtest, req)
+            response_data = _oi_response(oi_result, run_id)
+        else:
+            result = await asyncio.to_thread(_build_and_run, req)
+            response_data = _generic_response(result, run_id, req.strategy_type.upper())
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:
         raise HTTPException(500, f"backtest error: {e}")
-
-    s = result.stats
-    skipped = [t for t in result.trades if t.skip_reason]
-    executed = [t for t in result.trades if not t.skip_reason]
-
-    trades_out = [
-        TradeResult(
-            day=t.day.isoformat(),
-            gross=round(t.gross, 2),
-            cost=round(t.cost, 2),
-            net=round(t.net, 2),
-            exit_reason=t.exit_reason,
-            entry_spot=round(t.entry_spot, 2),
-            skip_reason=t.skip_reason,
-            vix=round(t.vix, 2),
-            expiry=t.expiry.isoformat() if t.expiry else None,
-            entry_time=t.entry_dt.isoformat() if t.entry_dt else None,
-            legs=[
-                LegResult(
-                    strike=f.strike,
-                    entry=round(f.entry, 2),
-                    exit=round(f.exit, 2),
-                    qty=f.qty,
-                    exit_reason=f.exit_reason,
-                    action=f.leg.action.value,
-                    opt_type=f.leg.opt_type.value,
-                    exit_time=f.exit_time.isoformat() if f.exit_time else None,
-                )
-                for f in t.legs
-            ],
-        )
-        for t in result.trades
-    ]
-    equity = list(accumulate([0.0] + [t.net for t in executed]))
-
-    response_data = BacktestResponse(
-        stats=StatsResult(
-            trades=s.trades,
-            win_rate=round(s.win_rate, 4),
-            net_pnl=round(s.net_pnl, 2),
-            expectancy=round(s.expectancy, 2),
-            avg_win=round(s.avg_win, 2),
-            avg_loss=round(s.avg_loss, 2),
-            max_drawdown=round(s.max_drawdown, 2),
-            sharpe=round(s.sharpe, 4),
-        ),
-        trades=trades_out,
-        equity_curve=[round(v, 2) for v in equity],
-        skipped_days=len(skipped),
-        run_id=run_id
-    )
 
     # Save to database
     try:
@@ -270,7 +308,7 @@ async def run_and_save_backtest(req: BacktestRequest):
             stats_json=response_data.json(),
             status="COMPLETED"
         )
-        storage.log_audit_event("BACKTEST_RUN", "BACKTEST", run_id, {"net_pnl": s.net_pnl})
+        storage.log_audit_event("BACKTEST_RUN", "BACKTEST", run_id, {"net_pnl": response_data.stats.net_pnl})
     except Exception as e:
         print(f"Error saving backtest run: {e}")
 

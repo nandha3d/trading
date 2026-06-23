@@ -399,6 +399,8 @@ export default function OptionsChain() {
     const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(`${proto}//${window.location.host}/api/live/stream`);
     wsRef.current = ws;
+    let gotMessage = false;
+    let manuallyClosed = false;
 
     ws.onopen = () => {
       ws.send(JSON.stringify({ action: "subscribe", underlying, expiry: liveExpiry }));
@@ -406,18 +408,41 @@ export default function OptionsChain() {
 
     ws.onmessage = (event) => {
       try {
+        gotMessage = true;
         const payload = JSON.parse(event.data);
-        if (payload.error) setError(payload.error);
-        else { setData(payload); setLoading(false); }
+        if (payload.error) {
+          setError(payload.error);
+          setLoading(false);
+        } else {
+          setData(payload);
+          setLoading(false);
+          if (payload.status && payload.status !== "ok") {
+            setError(payload.error ?? payload.status);
+          } else {
+            setError(null);
+          }
+        }
       } catch { /* ignore parse errors */ }
     };
 
-    ws.onerror = () => setError("Live feed connection error — retrying on next change.");
+    ws.onerror = () => {
+      setLoading(false);
+      setError("Live feed connection error. Check that the FastAPI backend is running on the Vite proxy target.");
+    };
     ws.onclose = () => {
-      if (isLive) setTimeout(() => setWsReconnect(n => n + 1), 3000);
+      setLoading(false);
+      if (!manuallyClosed && isLive) {
+        if (!gotMessage) {
+          setError("Live feed disconnected before data arrived. Restart backend or refresh Upstox/Angel session.");
+        }
+        setTimeout(() => setWsReconnect(n => n + 1), 3000);
+      }
     };
 
-    return () => { ws.close(); };
+    return () => {
+      manuallyClosed = true;
+      ws.close();
+    };
   }, [isLive, underlying, liveExpiry, wsReconnect]);
 
   const spotPrice = data?.spot_price ?? null;
